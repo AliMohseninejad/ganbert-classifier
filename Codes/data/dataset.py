@@ -1,6 +1,7 @@
 import torch
 from typing import *
 from torch.utils.data import Dataset
+from transformers import BertTokenizer
 
 
 class GanBertDataset(Dataset):

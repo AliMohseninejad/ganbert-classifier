@@ -1,13 +1,13 @@
 import torch
 from typing import *
-import torch.nn as nn
 from torch.utils.data import DataLoader
+from transformers import BertTokenizer
 
 
 def generate_dataloader(
     dataset_folder_path: str,
     unsupervised_ratio: float,
-    tokenizer,
+    tokenizer: BertTokenizer,
     train_batch_size: int,
     valid_batch_size: int,
     test_batch_size: int,
@@ -20,7 +20,7 @@ def generate_dataloader(
         dataset_folder_path (str): Path to the parent folder of dataset
         unsupervised_ratio (float): A number in range [0..1] that specifies the
         ratio of the trainset that is unsupervised.
-        tokenizer: The tokenizer Used for encoding the text
+        tokenizer (BertTokenizer): The tokenizer Used for encoding the text
         train_batch_size (int): Training data batch-size
         valid_batch_size (int): Validation data batch-size
         test_batch_size (int): Test data batch-size
