@@ -1,6 +1,6 @@
 from model.discriminator      import Discriminator
 from model.generator1         import Generator
-from training.loss            import GeneratorLossFunction, DiscriminatorLossFunction
+from loss                     import GeneratorLossFunction, DiscriminatorLossFunction
 from typing                   import *
 from torch.optim.lr_scheduler import LRScheduler
 from transformers             import BertModel
@@ -15,7 +15,6 @@ def train_vanilla_classier(
     transformer          : BertModel               ,
     classifier           : Discriminator           ,
     optimizer            : optim.Optimizer         ,
-    loss_function        : nn.Module               ,
     epochs               : int                     ,
     scheduler            : Union[LRScheduler, None],
     train_dataloader     : DataLoader              ,
@@ -46,10 +45,17 @@ def train_vanilla_classier(
         epoch, validation loss per epoch, train accuracy, val accuracy, ...
     """    
     
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    transformer.to(device)
+    classifier.to(device)
+
+    optimizer = optim.Optimizer([{'params': transformer.parameters()}, {'params': classifier.parameters()}])
+
+    loss_function = nn.CrossEntropyLoss()
+    
     results    = []
     best_loss  = float('inf')
     best_epoch = 0
-    device     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     for epoch in range(epochs):
         
@@ -64,10 +70,15 @@ def train_vanilla_classier(
         for batch in train_dataloader:
             
             optimizer.zero_grad()
-            inputs  = batch['inputs']
-            labels  = batch['labels']
-            outputs = classifier(transformer(inputs))
-            loss    = loss_function(outputs, labels)
+            # Unpack this training batch from our dataloader. 
+            encoded_input          = batch[0].to(device)
+            encoded_attention_mask = batch[1].to(device)
+            labels                 = batch[2].to(device)
+            if bow_mode:
+                encoded_bow = batch[3].to(device)
+                
+            outputs = classifier(transformer(encoded_input, attention_mask=encoded_attention_mask))
+            loss = loss_function(outputs, labels)
             
             loss.backward()
             optimizer.step()
@@ -81,9 +92,13 @@ def train_vanilla_classier(
         with torch.no_grad():
             for batch in validation_dataloader:
                 
-                inputs  = batch["inputs"]
-                labels  = batch["labels"]
-                outputs = classifier(transformer(inputs))
+                encoded_input          = batch[0].to(device)
+                encoded_attention_mask = batch[1].to(device)
+                labels                 = batch[2].to(device)
+                if bow_mode:
+                    encoded_bow = batch[3].to(device)
+                    
+                outputs = classifier(transformer(encoded_input, attention_mask=encoded_attention_mask))
                 loss    = loss_function(outputs, labels)
                 validation_loss     += loss.item()
                 validation_accuracy += (outputs.argmax(dim=1) == labels).sum().item()
@@ -93,14 +108,14 @@ def train_vanilla_classier(
         train_accuracy      /= len(train_dataloader.dataset)
         validation_loss     /= len(validation_dataloader.dataset)
         validation_accuracy /= len(validation_dataloader.dataset)
-
+        
         # Update best model
         if validation_loss < best_loss:
             best_loss  = validation_loss
             best_epoch = epoch
             torch.save(classifier.state_dict() , classifier_path)
             torch.save(transformer.state_dict(), transformer_path)
-
+        
         # Update learning rate scheduler
         if scheduler is not None:
             scheduler.step()
@@ -114,17 +129,19 @@ def train_vanilla_classier(
 
         # Update results
         result = {
-            "epoch"         : epoch,
-            "train_loss"    : train_loss,
-            "train_accuracy": train_accuracy,
-            "val_loss"      : validation_loss,
-            "val_accuracy"  : validation_accuracy,
+            "epoch"               : epoch,
+            "train_loss"          : train_loss,
+            "train_accuracy"      : train_accuracy,
+            "validation_loss"     : validation_loss,
+            "validation_accuracy" : validation_accuracy,
         }
         results.append(result)
 
     print(f"Best model saved at epoch {best_epoch} with validation loss: {best_loss:.4f}")
     
     return transformer, classifier, results
+
+    
 
 #==================================================================================================
 
@@ -144,7 +161,7 @@ def train_gan(
     validation_dataloader      : DataLoader                 ,
     generator_path             : str                        ,
     transformer_path           : str                        ,
-    classifier_path            : str                        ,
+    discriminator_path         : str                        ,
 ) -> Tuple[BertModel, Generator, Discriminator, List[Dict[str, float]]]:
     """Main function to train the BERT-GAN model. In this code, the model is
     trained and validated. In the end the best model is saved on disk.
@@ -167,7 +184,9 @@ def train_gan(
         learning rate scheduler. No scheduler if None.
         train_dataloader (DataLoader): training dataloader
         validation_dataloader (DataLoader): validation dataloader
-        save_path (str): The path to the folder where models should be saved.
+        generator_path (str): The path to the folder where generator should be saved
+        transformer_path (str): The path to the folder where transformer should be saved
+        discriminator_path (str): The path to the folder where discriminator should be saved
 
     Returns:
         Tuple[BertModel, Generator, Discriminator, List[Dict[str, float]]]: A
@@ -181,6 +200,15 @@ def train_gan(
     best_loss  = float('inf')
     best_epoch = 0
     device     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    generator_loss_function     = GeneratorLossFunction()
+    discriminator_loss_function = DiscriminatorLossFunction()
+    
+    generator.to(device)
+    discriminator.to(device)
+    transformer.to(device)
+    
+    optimizer = optim.Optimizer([{'params': transformer.parameters()}, {'params': discriminator.parameters()}])
 
     for epoch in range(epochs):
         
@@ -195,15 +223,13 @@ def train_gan(
         discriminator.train()
         transformer.train()
         
-        #--------------------------------------------------------------------------------
         #train
         for batch in train_dataloader:
             
             generator_optimizer.zero_grad()
             discriminator_optimizer.zero_grad()
-            transformer.zero_grad()
-            
-            
+            #transformer_optimizer.zero_grad()  # Do we need this ???????????????????????????????????????????????????????????????????? 
+                        
             # Unpack this training batch from our dataloader. 
             encoded_input          = batch[0].to(device)
             encoded_attention_mask = batch[1].to(device)
@@ -217,15 +243,18 @@ def train_gan(
             model_outputs = transformer(encoded_input, attention_mask=encoded_attention_mask)
             hidden_states = model_outputs[-1]
 
+            # Define noise_size as the same size as the encoded_input
+            noise_size = encoded_input.shape[1]
+
             noise = torch.zeros(real_batch_size, noise_size, device=device).uniform_(0, 1)
         
             #-------------------------------
             
             # Train Generator
             if bow_mode:
-                generator_outputs, real_features, generated_features = transformer(encoded_bow)  
+                generator_outputs = transformer(encoded_bow)  
             else:
-                generator_outputs, real_features, generated_features = generator(noise)
+                generator_outputs = generator(noise)
                 
             generator_loss = generator_loss_function(generator_outputs, real_features, generated_features)
             
@@ -233,8 +262,7 @@ def train_gan(
             generator_optimizer.step()
 
             #------------------------------------
-
-                    
+            
             # Train Discriminator
             discriminator_input = torch.cat([hidden_states, generator_outputs], dim=0)
             
@@ -262,7 +290,7 @@ def train_gan(
             Discriminator_real_logits      = logits_list[0]
             Discriminator_fake_logits      = logits_list[1]
             
-            probability_list = torch.split(probability, real_batch_size)
+            probability_list = torch.split(probabilities, real_batch_size)
             Discriminator_real_probability = probability_list[0]
             Discriminator_fake_probability = probability_list[1]
             #--------------------------------------------------------------------------
@@ -271,15 +299,10 @@ def train_gan(
             logits               = Discriminator_real_logits[:,0:-1]
             logits_probabilities = F.log_softmax(logits, dim=-1)
             
-            # The discriminator provides an output for labeled and unlabeled real data
-            # so the loss evaluated for unlabeled data is ignored (masked)
-            
-            label_to_one_hot =  F.one_hot(b_labels, len(label_list))
-            per_example_loss = -torch.sum(label_to_one_hot * logits_probabilities, dim=-1)
-            per_example_loss =  torch.masked_select(per_example_loss, encoded_bow.to(device))
-            labeled_example_count = per_example_loss.type(torch.float32).numel()
-
             #--------------------------------------------------------------------------
+            Fake_Labels = torch.Tensor(batch_size, num_classes)
+            
+            
             discriminator_loss = discriminator_loss_function(labels, Discriminator_real_probability, Discriminator_fake_probability) 
 
             discriminator_loss.backward()
@@ -340,10 +363,10 @@ def train_gan(
         if val_loss < best_loss:
             best_loss  = val_loss
             best_epoch = epoch
-            torch.save(generator.state_dict()  , generator_path)
-            torch.save(classifier.state_dict() , classifier_path)
-            torch.save(transformer.state_dict(), transformer_path)
-
+            torch.save(generator.state_dict()     , generator_path     )
+            torch.save(discriminator.state_dict() , discriminator_path )
+            torch.save(transformer.state_dict()   , transformer_path   )
+            
         # Update results
         result = {
             "epoch"          : epoch,
@@ -363,4 +386,4 @@ def train_gan(
     
     print(f"Best model saved at epoch {best_epoch} with validation loss: {best_loss:.4f}")
     
-    return transformer, generator, classifier, results
+    return transformer, generator, discriminator, results
