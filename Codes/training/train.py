@@ -399,6 +399,13 @@ def train_gan(
         }
         results.append(result)
         #------------------------------------------------------------------------------------------
+        
+        # Update learning rate scheduler
+        if generator_scheduler is not None:
+            generator_scheduler.step()
+        if discriminator_scheduler is not None:
+            discriminator_scheduler.step()
+        
         # Print progress
         print(
             f"Epoch {epoch+1}/{epochs}: "
