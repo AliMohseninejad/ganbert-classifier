@@ -1,14 +1,16 @@
-from model.discriminator      import Discriminator
-from model.generator1         import Generator
-from loss                     import GeneratorLossFunction, DiscriminatorLossFunction
-from typing                   import *
-from torch.optim.lr_scheduler import LRScheduler
-from transformers             import BertModel
-from torch.utils.data         import DataLoader
-import torch.nn.functional    as F
-import torch.optim            as optim
-import torch.nn               as nn
+from   model.discriminator      import Discriminator
+from   model.generator1         import Generator
+from   loss                     import GeneratorLossFunction, DiscriminatorLossFunction
+from   typing                   import *
+from   torch.optim.lr_scheduler import LRScheduler
+from   transformers             import BertModel
+from   torch.utils.data         import DataLoader
+from   sklearn.metrics          import precision_score, recall_score, f1_score
+import torch.nn.functional      as F
+import torch.optim              as optim
+import torch.nn                 as nn
 import torch
+
 
 
 def train_vanilla_classier(
@@ -61,8 +63,11 @@ def train_vanilla_classier(
         
         train_loss          = 0.0
         train_accuracy      = 0.0
+        train_f1            = 0.0
+        #------------------------
         validation_loss     = 0.0
         validation_accuracy = 0.0
+        validation_f1       = 0.0
         
         classifier.train()
         transformer.train() 
@@ -74,17 +79,19 @@ def train_vanilla_classier(
             encoded_input          = batch[0].to(device)
             encoded_attention_mask = batch[1].to(device)
             labels                 = batch[2].to(device)
-            if bow_mode:
-                encoded_bow = batch[3].to(device)
+            #if bow_mode:
+            #    encoded_bow = batch[3].to(device)
                 
             outputs = classifier(transformer(encoded_input, attention_mask=encoded_attention_mask))
-            loss = loss_function(outputs, labels)
+            loss    = loss_function(outputs, labels)
             
             loss.backward()
             optimizer.step()
             train_loss     += loss.item()
             train_accuracy += (outputs.argmax(dim=1) == labels).sum().item()
+            train_f1 += f1_score(labels.cpu().numpy(), outputs.argmax(dim=1).cpu().numpy(), average='binary')
 
+            
         # Validation
         classifier.eval()
         transformer.eval()
@@ -95,19 +102,23 @@ def train_vanilla_classier(
                 encoded_input          = batch[0].to(device)
                 encoded_attention_mask = batch[1].to(device)
                 labels                 = batch[2].to(device)
-                if bow_mode:
-                    encoded_bow = batch[3].to(device)
+                #if bow_mode:
+                #    encoded_bow = batch[3].to(device)
                     
                 outputs = classifier(transformer(encoded_input, attention_mask=encoded_attention_mask))
                 loss    = loss_function(outputs, labels)
                 validation_loss     += loss.item()
                 validation_accuracy += (outputs.argmax(dim=1) == labels).sum().item()
+                validation_f1       += f1_score(labels.cpu().numpy(), outputs.argmax(dim=1).cpu().numpy(), average='binary')
+
 
         # Calculate average loss and accuracy
         train_loss          /= len(train_dataloader.dataset)
         train_accuracy      /= len(train_dataloader.dataset)
+        train_f1            /= len(train_dataloader.dataset)
         validation_loss     /= len(validation_dataloader.dataset)
         validation_accuracy /= len(validation_dataloader.dataset)
+        validation_f1       /= len(validation_dataloader.dataset)
         
         # Update best model
         if validation_loss < best_loss:
@@ -123,21 +134,23 @@ def train_vanilla_classier(
         # Print progress
         print(
             f"Epoch {epoch + 1}/{epochs}: "
-            f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, "
-            f"Val Loss: {validation_loss:.4f}, Val Accuracy: {validation_accuracy:.4f}"
+            f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Train F1: {train_f1:.4f}"
+            f"Validation Loss: {validation_loss:.4f}, Validation Accuracy: {validation_accuracy:.4f}, Validation F1: {validation_f1:.4f}"
         )
 
         # Update results
         result = {
-            "epoch"               : epoch,
-            "train_loss"          : train_loss,
-            "train_accuracy"      : train_accuracy,
-            "validation_loss"     : validation_loss,
-            "validation_accuracy" : validation_accuracy,
+            "epoch"               : epoch               ,
+            "train_loss"          : train_loss          ,
+            "train_accuracy"      : train_accuracy      ,
+            "train_f1"            : train_f1            ,
+            "validation_loss"     : validation_loss     ,
+            "validation_accuracy" : validation_accuracy ,
+            "validation_f1"       : validation_f1       ,
         }
         results.append(result)
 
-    print(f"Best model saved at epoch {best_epoch} with validation loss: {best_loss:.4f}")
+    print(f"Best model saved at epoch {best_epoch}")
     
     return transformer, classifier, results
 
@@ -193,7 +206,7 @@ def train_gan(
         tuple containing the trained BERT model, The trained Generator, the
         trained Discriminator and a list of results.  Each element of the list
         is a dictionary containing train loss per epoch, validation loss per
-        epoch, train accuracy, val accuracy, ...
+        epoch, train accuracy, validation accuracy, ...
     """
     
     results    = []
@@ -208,15 +221,18 @@ def train_gan(
     discriminator.to(device)
     transformer.to(device)
     
-    optimizer = optim.Optimizer([{'params': transformer.parameters()}, {'params': discriminator.parameters()}])
-
     for epoch in range(epochs):
         
-        train_loss     = 0.0
-        train_accuracy = 0.0
-        val_loss       = 0.0
-        val_accuracy   = 0.0
-        total_examples = 0.0
+        train_loss          = 0.0
+        validation_loss     = 0.0
+        #------------------------
+        train_accuracy      = 0.0
+        validation_accuracy = 0.0
+        #------------------------
+        train_f1            = 0.0
+        validation_f1       = 0.0
+        #------------------------
+        total_examples      = 0.0
 
         # Training loop
         generator.train()
@@ -228,7 +244,6 @@ def train_gan(
             
             generator_optimizer.zero_grad()
             discriminator_optimizer.zero_grad()
-            #transformer_optimizer.zero_grad()  # Do we need this ???????????????????????????????????????????????????????????????????? 
                         
             # Unpack this training batch from our dataloader. 
             encoded_input          = batch[0].to(device)
@@ -299,9 +314,7 @@ def train_gan(
             logits               = Discriminator_real_logits[:,0:-1]
             logits_probabilities = F.log_softmax(logits, dim=-1)
             
-            #--------------------------------------------------------------------------
-            Fake_Labels = torch.Tensor(batch_size, num_classes)
-            
+            #-------------------------------------------------------------------------
             
             discriminator_loss = discriminator_loss_function(labels, Discriminator_real_probability, Discriminator_fake_probability) 
 
@@ -310,10 +323,12 @@ def train_gan(
 
             train_loss     += (generator_loss.item() + discriminator_loss.item())
             train_accuracy += correct_predictions.item()
+            train_f1       += f1_score(labels.cpu().numpy(), real_predictions.cpu().numpy(), average='binary')
 
         train_loss     /= len(train_dataloader.dataset)
         train_accuracy /= len(train_dataloader.dataset)
-
+        train_f1       /= len(train_dataloader.dataset)
+        
         # Validation loop
         generator.eval()
         discriminator.eval()
@@ -352,38 +367,45 @@ def train_gan(
 
                 discriminator_loss = discriminator_loss_function(labels, probabilities)
 
-                val_loss    += (discriminator_loss.item() + generator_loss.item()          )
-                val_accuracy+= (correct_predictions_d.item() + correct_predictions_g.item())
+                validation_loss     += (discriminator_loss.item() + generator_loss.item()          )
+                validation_accuracy += (correct_predictions_d.item() + correct_predictions_g.item())
+                validation_f1       += f1_score(labels.cpu().numpy(), real_predictions.cpu().numpy(), average='binary') 
 
         # Calculate average loss and accuracy
-        val_loss     /= len(validation_dataloader.dataset)
-        val_accuracy   /= len(validation_dataloader.dataset)
+        validation_loss     /= len(validation_dataloader.dataset)
+        validation_accuracy /= len(validation_dataloader.dataset)
+        validation_f1       /= len(validation_dataloader.dataset)
 
         # Update best model
-        if val_loss < best_loss:
-            best_loss  = val_loss
+        if validation_loss < best_loss:
+            best_loss  = validation_loss
             best_epoch = epoch
             torch.save(generator.state_dict()     , generator_path     )
             torch.save(discriminator.state_dict() , discriminator_path )
             torch.save(transformer.state_dict()   , transformer_path   )
-            
+        
+        #------------------------------------------------------------------------------------------
         # Update results
         result = {
-            "epoch"          : epoch,
-            "train_loss"     : train_loss,
-            "train_accuracy" : train_accuracy,
-            "val_loss"       : val_loss,
-            "val_accuracy"   : val_accuracy,
+            "epoch"               : epoch,
+            #-------------------------------------------
+            "train_loss"          : train_loss,
+            "train_accuracy"      : train_accuracy,
+            "train_f1"            : train_f1,
+            #-------------------------------------------
+            "validation_loss"     : validation_loss,
+            "validation_accuracy" : validation_accuracy,
+            "validation_f1"       : validation_f1
         }
         results.append(result)
-
+        #------------------------------------------------------------------------------------------
         # Print progress
         print(
             f"Epoch {epoch+1}/{epochs}: "
-            f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, "
-            f"Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.4f}"
+            f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f},Train_f1: {train_f1: .4f}"
+            f"Validation Loss: {validation_loss:.4f}, Validation Accuracy: {validation_accuracy:.4f}, Validation_f1: {validation_f1:.4f}"
         )
     
-    print(f"Best model saved at epoch {best_epoch} with validation loss: {best_loss:.4f}")
+    print(f"Best model saved at epoch {best_epoch}")
     
     return transformer, generator, discriminator, results
