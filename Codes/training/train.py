@@ -1,6 +1,6 @@
 from   model.discriminator      import Discriminator
 from   model.generator1         import Generator
-from   loss                     import GeneratorLossFunction, DiscriminatorLossFunction
+from   training.loss               import GeneratorLossFunction, DiscriminatorLossFunction
 from   typing                   import *
 from   torch.optim.lr_scheduler import LRScheduler
 from   transformers             import BertModel
