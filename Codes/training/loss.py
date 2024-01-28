@@ -24,7 +24,7 @@ class GeneratorLossFunction(nn.Module):
     def forward(
         self, generator_outputs, Discriminator_real_features, Discriminator_fake_features
     ):
-        Loss_G_Unsupervised = -torch.mean(torch.log(1 - generator_outputs[:, -1] + 1e-8)) #[:, -1] is used to extract the probabilities of the "extra" or "fake" class from the gen_probs tensor.
+        Loss_G_Unsupervised  = -torch.mean(torch.log(1 - generator_outputs[:, -1] + 1e-8)) #[:, -1] is used to extract the probabilities of the "extra" or "fake" class from the gen_probs tensor.
         #-------------------------------------------------------------------------------------
         # Feature Matching Loss
         Loss_FeatureMatching = (torch.pow(torch.mean(Discriminator_real_features, dim=0) - torch.mean(Discriminator_fake_features, dim=0),2)) / 768  # represents the discrepancy between the real and generated feature distributions.
@@ -43,6 +43,8 @@ class DiscriminatorLossFunction(nn.Module):
     def forward(
         self, 
         labels,
+        supervised_indices,
+        unsupervised_indices,
         Discriminator_real_probability ,
         Discriminator_fake_probability ,
     ):
@@ -50,12 +52,14 @@ class DiscriminatorLossFunction(nn.Module):
         #-------------------------------------------------------------------------------------
         Loss_Function = nn.NLLLoss(reduction='mean')
         #-------------------------------------------------------------------------------------
-        
-        Loss_D_supervised  = Loss_Function(torch.log(Discriminator_real_probability + 1e-8), labels) 
+        if supervised_indices.shape[0] ==0 :
+            Loss_D_supervised  = torch.zeros((1,)).to(labels.device)
+        else :
+            Loss_D_supervised  = Loss_Function(torch.log(Discriminator_real_probability[supervised_indices] + 1e-8), labels[supervised_indices]) 
 
         #-------------------------------------------------------------------------------------
         # unsupervised loss
-        Loss_Unsupervised_Real       = -torch.mean(torch.log(1 - Discriminator_real_probability + 1e-8)) # 1e-8 added to avoid numerical instability
+        Loss_Unsupervised_Real       = -torch.mean(torch.log(1 - Discriminator_real_probability[unsupervised_indices] + 1e-8)) # 1e-8 added to avoid numerical instability
         Loss_Unsupervised_Generated  = -torch.mean(torch.log(Discriminator_fake_probability     + 1e-8))
         
         Loss_D_unsupervised         = Loss_Unsupervised_Real + Loss_Unsupervised_Generated

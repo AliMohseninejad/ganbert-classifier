@@ -5,11 +5,12 @@ from   typing                   import *
 from   torch.optim.lr_scheduler import LRScheduler
 from   transformers             import BertModel
 from   torch.utils.data         import DataLoader
-from   sklearn.metrics          import precision_score, recall_score, f1_score
+from   sklearn.metrics          import f1_score
 import torch.nn.functional      as F
 import torch.optim              as optim
 import torch.nn                 as nn
 import torch
+import numpy                    as np 
 
 
 
@@ -232,7 +233,15 @@ def train_gan(
         train_f1            = 0.0
         validation_f1       = 0.0
         #------------------------
-        total_examples      = 0.0
+        corrects            = 0.0
+        validation_corrects = 0.0
+        data_count          = 0.0
+        validation_data_count = 0.0
+        
+        predictions_f1 = []
+        validation_predictions_f1 = []
+        true_labels_f1 = []
+        validation_true_labels_f1 = []
 
         # Training loop
         generator.train()
@@ -249,9 +258,13 @@ def train_gan(
             encoded_input          = batch[0].to(device)
             encoded_attention_mask = batch[1].to(device)
             labels                 = batch[2].to(device)
+            is_supervised          = batch[3].to(device)
             if bow_mode:
-                encoded_bow = batch[3].to(device)
+                encoded_bow = batch[4].to(device)
+                encoded_bow_attention = batch[5].to(device)
 
+            supervised_indices = torch.nonzero(is_supervised == 1).squeeze()
+            unsupervised_indices =torch.nonzero(is_supervised == 0).squeeze()
             real_batch_size = encoded_input.shape[0]
             
             # Encode real data in the Transformer
@@ -260,75 +273,79 @@ def train_gan(
 
             # Define noise_size as the same size as the encoded_input
             noise_size = encoded_input.shape[1]
-
+            
             noise = torch.zeros(real_batch_size, noise_size, device=device).uniform_(0, 1)
         
             #-------------------------------
             
             # Train Generator
             if bow_mode:
-                generator_outputs = transformer(encoded_bow)  
+                generator_outputs = transformer(encoded_bow, attention_mask=encoded_bow_attention)  
             else:
                 generator_outputs = generator(noise)
-                
-            generator_loss = generator_loss_function(generator_outputs, real_features, generated_features)
-            
-            generator_loss.backward()
-            generator_optimizer.step()
 
             #------------------------------------
             
             # Train Discriminator
-            discriminator_input = torch.cat([hidden_states, generator_outputs], dim=0)
+            discriminator_input = torch.cat([generator_outputs, hidden_states], dim=0)
             
             features, logits, probabilities = discriminator(discriminator_input)
             
             # Calculate the number of correct predictions for real and fake examples
-            real_predictions = (probabilities[:real_batch_size] >= 0.5).long()
-            fake_predictions = (probabilities[real_batch_size:] < 0.5).long()
-
-            # Calculate the number of correct predictions for the entire batch
-            correct_predictions = (real_predictions == labels).sum() + (fake_predictions == 1 - labels).sum()
-
-            # Increment the total number of examples
-            total_examples += real_batch_size
+            fake_predictions = probabilities[:real_batch_size] 
+            real_predictions = probabilities[real_batch_size:]
             
+            #------------------------------------------------
+            if supervised_indices.shape[0] != 0 :
+                real_prediction_supervised = real_predictions[supervised_indices]
+                sup_fake_probabilities = torch.cat([real_prediction_supervised, fake_predictions], dim=0)
+                _, predictions = sup_fake_probabilities.max(1)      
+                fake_labels = torch.zeros_like(fake_predictions)   
+                fake_labels[:,-1] = 1                     
+                fake_labels.to(fake_predictions.device)
+                all_labels = torch.cat([fake_labels, labels],dim=0)
+            else:
+                _, predictions = fake_predictions.max(1)      
+                all_labels = torch.zeros_like(fake_predictions)   
+                all_labels[:,-1] = 1                     
+                all_labels.to(fake_predictions.device)
             
+            _, labels_index = all_labels.max(1)
+            correct_predictions_d = predictions.eq(labels_index).sum().item()
+            one_hot_predictions   = F.one_hot(predictions)
+            one_hot_labels        = F.one_hot(labels)
             #-------------------------------------------------------------------------
             # Finally, we separate the discriminator's output for the real and fake data
             
             features_list    = torch.split(features, real_batch_size)
             Discriminator_real_features    = features_list[0]
             Discriminator_fake_features    = features_list[1]
-
-            logits_list      = torch.split(logits, real_batch_size)
-            Discriminator_real_logits      = logits_list[0]
-            Discriminator_fake_logits      = logits_list[1]
             
             probability_list = torch.split(probabilities, real_batch_size)
             Discriminator_real_probability = probability_list[0]
             Discriminator_fake_probability = probability_list[1]
             #--------------------------------------------------------------------------
             
-            # Discriminator's LOSS estimation
-            logits               = Discriminator_real_logits[:,0:-1]
-            logits_probabilities = F.log_softmax(logits, dim=-1)
+            discriminator_loss = discriminator_loss_function(labels, supervised_indices, unsupervised_indices, Discriminator_real_probability, Discriminator_fake_probability) 
+            generator_loss     = generator_loss_function(generator_outputs, Discriminator_real_features, Discriminator_fake_features)
             
-            #-------------------------------------------------------------------------
-            
-            discriminator_loss = discriminator_loss_function(labels, Discriminator_real_probability, Discriminator_fake_probability) 
-
+            generator_loss.backward(retain_graph=True)
+            generator_optimizer.step()
             discriminator_loss.backward()
             discriminator_optimizer.step()
+            
+            train_loss  += (generator_loss.item() + discriminator_loss.item())
+            data_count  += labels.size(0)
+            corrects    += correct_predictions_d   
+            predictions_f1.extend(one_hot_predictions.cpu())
+            true_labels_f1.extend(one_hot_labels.cpu())
 
-            train_loss     += (generator_loss.item() + discriminator_loss.item())
-            train_accuracy += correct_predictions.item()
-            train_f1       += f1_score(labels.cpu().numpy(), real_predictions.cpu().numpy(), average='binary')
+        train_loss       /= len(train_dataloader)
+        train_accuracy    = corrects / data_count
+        true_labels_f1_np = np.array(true_labels_f1)
+        predictions_f1_np = np.array(predictions_f1)
+        train_f1          = f1_score(true_labels_f1_np, predictions_f1_np, average='binary')
 
-        train_loss     /= len(train_dataloader.dataset)
-        train_accuracy /= len(train_dataloader.dataset)
-        train_f1       /= len(train_dataloader.dataset)
-        
         # Validation loop
         generator.eval()
         discriminator.eval()
@@ -337,44 +354,96 @@ def train_gan(
         with torch.no_grad():
             for batch in validation_dataloader:
                 
+                # Unpack this training batch from our dataloader. 
                 encoded_input          = batch[0].to(device)
                 encoded_attention_mask = batch[1].to(device)
                 labels                 = batch[2].to(device)
+                is_supervised          = batch[3].to(device)
                 if bow_mode:
-                    encoded_bow = batch[3].to(device)
-
+                    encoded_bow = batch[4].to(device)
+                    encoded_bow_attention = batch[5].to(device)
+                    
+                supervised_indices   = torch.nonzero(is_supervised == 1).squeeze()
+                unsupervised_indices = torch.nonzero(is_supervised == 0).squeeze()
                 real_batch_size = encoded_input.shape[0]
 
-                if bow_mode:
-                    generator_outputs, real_features, generated_features = transformer(encoded_bow)  
-                else:
-                    generator_outputs, real_features, generated_features = generator(noise)
-                    
-                generator_loss_function(generator_outputs, real_features, generated_features)
-                
-                real_predictions = (generator_outputs[:real_batch_size] >= 0.5).long()
-                fake_predictions = (generator_outputs[real_batch_size:] < 0.5).long()
-                correct_predictions_g = (real_predictions == labels).sum() + (fake_predictions == 1 - labels).sum()
+                # Encode real data in the Transformer
+                model_outputs = transformer(encoded_input, attention_mask=encoded_attention_mask)
+                hidden_states = model_outputs[-1]
 
-                # Discriminator Validation
-                discriminator_input = torch.cat([hidden_states, generator_outputs], dim=0)
+                # Define noise_size as the same size as the encoded_input
+                noise_size = encoded_input.shape[1]
+
+                noise = torch.zeros(real_batch_size, noise_size, device=device).uniform_(0, 1)
+
+                #-------------------------------
+
+                # Train Generator
+                if bow_mode:
+                    generator_outputs = transformer(encoded_bow, attention_mask=encoded_bow_attention)  
+                else:
+                    generator_outputs = generator(noise)
+
+                #------------------------------------
+
+                # Train Discriminator
+                discriminator_input = torch.cat([generator_outputs, hidden_states], dim=0)
 
                 features, logits, probabilities = discriminator(discriminator_input)
 
-                real_predictions = (probabilities[:real_batch_size] >= 0.5).long()
-                fake_predictions = (probabilities[real_batch_size:] < 0.5).long()
-                correct_predictions_d = (real_predictions == labels).sum() + (fake_predictions == 1 - labels).sum()
+                # Calculate the number of correct predictions for real and fake examples
+                fake_predictions = probabilities[:real_batch_size] 
+                real_predictions = probabilities[real_batch_size:]
 
-                discriminator_loss = discriminator_loss_function(labels, probabilities)
+                #------------------------------------------------
+                if supervised_indices.shape[0] != 0 :
+                    real_prediction_supervised = real_predictions[supervised_indices]
+                    sup_fake_probabilities = torch.cat([real_prediction_supervised, fake_predictions], dim=0)
+                    _, predictions = sup_fake_probabilities.max(1)      
+                    fake_labels = torch.zeros_like(fake_predictions)   
+                    fake_labels[:,-1] = 1                     
+                    fake_labels.to(fake_predictions.device)
+                    all_labels = torch.cat([fake_labels, labels],dim=0)
+                else:
+                    _, predictions = fake_predictions.max(1)      
+                    all_labels = torch.zeros_like(fake_predictions)   
+                    all_labels[:,-1] = 1                     
+                    all_labels.to(fake_predictions.device)
 
-                validation_loss     += (discriminator_loss.item() + generator_loss.item()          )
-                validation_accuracy += (correct_predictions_d.item() + correct_predictions_g.item())
-                validation_f1       += f1_score(labels.cpu().numpy(), real_predictions.cpu().numpy(), average='binary') 
+                _, labels_index = all_labels.max(1)
+                correct_predictions_d = predictions.eq(labels_index).sum().item()
+                one_hot_predictions   = F.one_hot(predictions)
+                one_hot_labels        = F.one_hot(labels)
+                #-------------------------------------------------------------------------
+                # Finally, we separate the discriminator's output for the real and fake data
+
+                features_list    = torch.split(features, real_batch_size)
+                Discriminator_real_features    = features_list[0]
+                Discriminator_fake_features    = features_list[1]
+
+                probability_list = torch.split(probabilities, real_batch_size)
+                Discriminator_real_probability = probability_list[0]
+                Discriminator_fake_probability = probability_list[1]
+                #--------------------------------------------------------------------------
+
+                discriminator_loss = discriminator_loss_function(labels, supervised_indices, unsupervised_indices, Discriminator_real_probability, Discriminator_fake_probability) 
+                generator_loss     = generator_loss_function(generator_outputs, Discriminator_real_features, Discriminator_fake_features)
+
+                
+
+                validation_loss  += (generator_loss.item() + discriminator_loss.item())
+                validation_data_count  += labels.size(0)
+                validation_corrects    += correct_predictions_d   
+                validation_predictions_f1.extend(one_hot_predictions.cpu())
+                validation_true_labels_f1.extend(one_hot_labels.cpu())
+
 
         # Calculate average loss and accuracy
-        validation_loss     /= len(validation_dataloader.dataset)
-        validation_accuracy /= len(validation_dataloader.dataset)
-        validation_f1       /= len(validation_dataloader.dataset)
+        validation_loss     /= len(train_dataloader)
+        validation_accuracy    = corrects / data_count
+        validation_true_labels_f1_np = np.array(true_labels_f1)
+        validation_predictions_f1_np = np.array(predictions_f1)
+        validation_f1          = f1_score(validation_true_labels_f1_np,validation_predictions_f1_np, average='binary')
 
         # Update best model
         if validation_loss < best_loss:
