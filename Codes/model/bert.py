@@ -22,7 +22,6 @@ def get_bert_model(model_name: str = "bert-base-cased") -> Tuple[BertModel, Bert
     """
     transformer = AutoModel.from_pretrained(model_name)
     config = AutoConfig.from_pretrained(model_name)
-    transformer.config.pad_token_id = transformer.config.eos_token_id
     return (transformer, config)
 
 
@@ -41,6 +40,5 @@ def get_tokenizer(
         tokenizer and the configuration used for the tokenizer.
     """
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    tokenizer.pad_token = tokenizer.eos_token
     config = AutoConfig.from_pretrained(model_name)
     return (tokenizer, config)
