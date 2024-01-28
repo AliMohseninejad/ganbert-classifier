@@ -12,6 +12,63 @@ import torch
 import numpy as np
 
 
+def test_vanilla_bert(
+    transformer: BertModel,
+    generator: Union[Generator, BertModel],
+    discriminator: Discriminator,
+    test_dataloader: DataLoader,
+):
+    discriminator.eval()
+    transformer.eval()
+
+    test_corrects = 0.0
+    test_data_count = 0.0
+
+    test_predictions_f1 = []
+    test_true_labels_f1 = []
+
+    with torch.no_grad():
+        for batch in test_dataloader:
+            # Unpack this training batch from our dataloader.
+            encoded_input = batch[0]
+            encoded_attention_mask = batch[1]
+            labels = batch[2]
+            is_supervised = batch[3]
+
+            supervised_indices = torch.nonzero(is_supervised == 1).squeeze()
+
+            model_outputs = transformer(
+                encoded_input, attention_mask=encoded_attention_mask
+            )
+            features, logits, probabilities = discriminator(model_outputs)
+
+            if supervised_indices.shape[0] != 0:
+                real_prediction_supervised = probabilities[supervised_indices]
+                _, predictions = real_prediction_supervised.max(1)
+                correct_predictions_d = (
+                    predictions.eq(labels[supervised_indices].max(1)).sum().item()
+                )
+            else:
+                correct_predictions_d = torch.zeros((1,))
+
+            one_hot_predictions = F.one_hot(predictions)
+            one_hot_labels = labels[supervised_indices]
+
+            test_data_count += one_hot_labels.size(0)
+            test_corrects += correct_predictions_d
+            test_predictions_f1.extend(one_hot_predictions.cpu())
+            test_true_labels_f1.extend(one_hot_labels.cpu())
+
+        test_accuracy = test_corrects / test_data_count
+        test_true_labels_f1_np = np.array(test_true_labels_f1)
+        test_predictions_f1_np = np.array(test_predictions_f1)
+        test_f1 = f1_score(
+            test_true_labels_f1_np, test_predictions_f1_np, average="binary"
+        )
+    print(f"Test Accuracy equals: {test_accuracy}")
+    print(f"Test f1 score equals: {test_f1}")
+
+
 def test_gan_bert(
     transformer: BertModel,
     generator: Union[Generator, BertModel],
@@ -20,7 +77,7 @@ def test_gan_bert(
     test_dataloader: DataLoader,
 ):
     test_corrects = 0.0
-    validation_data_count = 0.0
+    test_data_count = 0.0
 
     test_predictions_f1 = []
     test_true_labels_f1 = []
@@ -98,13 +155,13 @@ def test_gan_bert(
             one_hot_labels = F.one_hot(labels_index)
             # -------------------------------------------------------------------------
 
-            validation_data_count += one_hot_labels.size(0)
+            test_data_count += one_hot_labels.size(0)
             test_corrects += correct_predictions_d
             test_predictions_f1.extend(one_hot_predictions.cpu())
             test_true_labels_f1.extend(one_hot_labels.cpu())
 
     # Calculate average loss and accuracy
-    test_accuracy = test_corrects / validation_data_count
+    test_accuracy = test_corrects / test_data_count
     test_true_labels_f1_np = np.array(test_true_labels_f1)
     test_predictions_f1_np = np.array(test_predictions_f1)
     test_f1 = f1_score(test_true_labels_f1_np, test_predictions_f1_np, average="binary")
