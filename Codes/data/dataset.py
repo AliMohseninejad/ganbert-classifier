@@ -1,7 +1,9 @@
+import pandas as pd  
 import torch
 from typing import *
 from torch.utils.data import Dataset
 from transformers import BertTokenizer
+import random
 
 
 class GanBertDataset(Dataset):
@@ -10,6 +12,7 @@ class GanBertDataset(Dataset):
     """
 
     def __init__(self, tokenizer: BertTokenizer, texts: List[str], labels: List[int], unsupervised_ratio: float):
+        random.seed(42)      
         self.tokenizer = tokenizer
         self.texts = texts
         self.labels = labels
@@ -35,7 +38,7 @@ class GanBertDataset(Dataset):
         label = torch.tensor(self.labels[index])
 
         # Convert label to one-hot tensor
-        num_classes = len(set(self.labels))
+        num_classes = len(set(self.labels))+1
         label_tensor = torch.nn.functional.one_hot(label, num_classes=num_classes)
         is_sup_tensor = torch.tensor(self.is_sup[index])
 
@@ -47,11 +50,12 @@ class GanBertBagOfWordsDataset(Dataset):
     model with an additional output for the BoW Generative model (BERT)
     """
 
-    def __init__(self, tokenizer: BertTokenizer, texts: List[str], labels: List[int], sample_length: int, unsupervised_ratio: float):
+    def __init__(self, tokenizer: BertTokenizer, texts: List[str], labels: List[int], unsupervised_ratio: float):
+        random.seed(42) 
         self.tokenizer = tokenizer
         self.texts = texts
         self.labels = labels
-        self.sample_length = sample_length
+        self.sample_length = 100
         self.vocabulary = self._create_vocabulary()
         self.is_sup = [0 if random.random() < unsupervised_ratio else 1 for _ in range(len(self.labels))]
 
@@ -99,7 +103,7 @@ class GanBertBagOfWordsDataset(Dataset):
 
 
         # Convert label to one-hot tensor
-        num_classes = len(set(self.labels))
+        num_classes = len(set(self.labels))+1
         label_tensor = torch.nn.functional.one_hot(label, num_classes=num_classes)
 
         # Generate Bag of Words sample
