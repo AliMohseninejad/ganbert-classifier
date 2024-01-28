@@ -1,4 +1,11 @@
-from transformers import AutoModel, AutoTokenizer, BertModel, BertConfig, BertTokenizer
+from transformers import (
+    AutoModel,
+    AutoTokenizer,
+    BertModel,
+    BertConfig,
+    BertTokenizer,
+    AutoConfig,
+)
 from typing import *
 
 
@@ -13,7 +20,9 @@ def get_bert_model(model_name: str = "bert-base-cased") -> Tuple[BertModel, Bert
         Tuple[BertModel, BertConfig]: A tuple of the pre-trained bert model and
         the configuration used for the model.
     """
-    pass
+    transformer = AutoModel.from_pretrained(model_name)
+    config = AutoConfig.from_pretrained(model_name)
+    return (transformer, config)
 
 
 def get_tokenizer(
@@ -30,4 +39,6 @@ def get_tokenizer(
         Tuple[BertTokenizer, BertConfig]: A tuple of the pre-trained bert
         tokenizer and the configuration used for the tokenizer.
     """
-    pass
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    config = AutoConfig.from_pretrained(model_name)
+    return (tokenizer, config)
