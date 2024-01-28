@@ -40,7 +40,7 @@ class GanBertDataset(Dataset):
 
         # Convert label to one-hot tensor
         num_classes = len(set(self.labels))+1
-        label_tensor = torch.nn.functional.one_hot(label, num_classes=num_classes)
+        label_tensor = torch.nn.functional.one_hot(label, num_classes=num_classes).float()
         is_sup_tensor = torch.tensor(self.is_sup[index])
 
         return encoded_input, encoded_attention_mask, label_tensor, is_sup_tensor
@@ -106,7 +106,7 @@ class GanBertBagOfWordsDataset(Dataset):
 
         # Convert label to one-hot tensor
         num_classes = len(set(self.labels))+1
-        label_tensor = torch.nn.functional.one_hot(label, num_classes=num_classes)
+        label_tensor = torch.nn.functional.one_hot(label, num_classes=num_classes).float()
 
         # Generate Bag of Words sample
         bow_sample_str = self._generate_bag_of_words_sample(text)
