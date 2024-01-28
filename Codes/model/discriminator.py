@@ -13,7 +13,7 @@ class Discriminator(nn.Module):
             layers.extend([nn.Linear(hidden_sizes[i], hidden_sizes[i+1]), nn.LeakyReLU(0.2, inplace=True), nn.Dropout(dropout_rate)])
 
         self.layers = nn.Sequential(*layers) #per il flatten
-        self.logit = nn.Linear(hidden_sizes[-1],num_labels+1) # +1 for the probability of this sample being fake/real.
+        self.logit = nn.Linear(hidden_sizes[-1],num_labels)
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, input_rep):
