@@ -10,9 +10,10 @@ import torch.nn.functional      as F
 import torch.optim              as optim
 import torch.nn                 as nn
 import torch
+import random
 import numpy                    as np 
 
-
+#=============================================================================
 
 def train_vanilla_classier(
     transformer          : BertModel               ,
@@ -47,7 +48,7 @@ def train_vanilla_classier(
         Each element of the list is a dictionary containing train loss per
         epoch, validation loss per epoch, train accuracy, val accuracy, ...
     """    
-    
+    random.seed(42)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     transformer.to(device)
     classifier.to(device)
@@ -256,7 +257,7 @@ def train_gan(
         is a dictionary containing train loss per epoch, validation loss per
         epoch, train accuracy, validation accuracy, ...
     """
-    
+    random.seed(42)
     results    = []
     best_loss  = float('inf')
     best_epoch = 0
