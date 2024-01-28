@@ -11,11 +11,12 @@ class GanBertDataset(Dataset):
     model
     """
 
-    def __init__(self, tokenizer: BertTokenizer, texts: List[str], labels: List[int], unsupervised_ratio: float):
+    def __init__(self, tokenizer: BertTokenizer, texts: List[str], labels: List[int], unsupervised_ratio: float, max_length):
         random.seed(42)      
         self.tokenizer = tokenizer
         self.texts = texts
         self.labels = labels
+        self.max_length = max_length
         self.is_sup = [0 if random.random() < unsupervised_ratio else 1 for _ in range(len(self.labels))]
 
     def __len__(self) -> int:
@@ -33,8 +34,8 @@ class GanBertDataset(Dataset):
             that for unsupervised data, the `label` is `-1`.
         """
         text = self.texts[index]
-        encoded_input = self.tokenizer(text, padding=True, truncation=True, return_tensors="pt")['input_ids'].squeeze(0)
-        encoded_attention_mask = self.tokenizer(text, padding=True, truncation=True, return_tensors="pt")['attention_mask'].squeeze(0)
+        encoded_input = self.tokenizer(text, padding="max_length", add_special_tokens=True, truncation=True, max_length=self.max_length, return_tensors="pt")['input_ids'].squeeze(0)
+        encoded_attention_mask = self.tokenizer(text, padding="max_length", add_special_tokens=True, truncation=True, max_length=self.max_length, return_tensors="pt")['attention_mask'].squeeze(0)
         label = torch.tensor(self.labels[index])
 
         # Convert label to one-hot tensor
@@ -50,13 +51,14 @@ class GanBertBagOfWordsDataset(Dataset):
     model with an additional output for the BoW Generative model (BERT)
     """
 
-    def __init__(self, tokenizer: BertTokenizer, texts: List[str], labels: List[int], unsupervised_ratio: float):
+    def __init__(self, tokenizer: BertTokenizer, texts: List[str], labels: List[int], unsupervised_ratio: float, max_length):
         random.seed(42) 
         self.tokenizer = tokenizer
         self.texts = texts
         self.labels = labels
         self.sample_length = 100
         self.vocabulary = self._create_vocabulary()
+        self.max_length = max_length
         self.is_sup = [0 if random.random() < unsupervised_ratio else 1 for _ in range(len(self.labels))]
 
     def __len__(self) -> int:
@@ -97,8 +99,8 @@ class GanBertBagOfWordsDataset(Dataset):
             data, the `label` is `-1`.
         """
         text = self.texts[index]
-        encoded_input = self.tokenizer(text, padding=True, truncation=True, return_tensors="pt")['input_ids'].squeeze(0)
-        encoded_attention_mask = self.tokenizer(text, padding=True, truncation=True, return_tensors="pt")['attention_mask'].squeeze(0)
+        encoded_input = self.tokenizer(text, padding="max_length", add_special_tokens=True,truncation=True, max_length=self.max_length, return_tensors="pt")['input_ids'].squeeze(0)
+        encoded_attention_mask = self.tokenizer(text, padding="max_length", add_special_tokens=True, truncation=True, max_length=self.max_length, return_tensors="pt")['attention_mask'].squeeze(0)
         label = torch.tensor(self.labels[index])
 
 
@@ -110,8 +112,8 @@ class GanBertBagOfWordsDataset(Dataset):
         bow_sample_str = self._generate_bag_of_words_sample(text)
         
         # Tokenize BoW sample
-        encoded_bow_sample = self.tokenizer(bow_sample_str, padding=True, truncation=True, return_tensors="pt")['input_ids'].squeeze(0)
-        encoded_bow_attention_mask = self.tokenizer(bow_sample_str, padding=True, truncation=True, return_tensors="pt")['attention_mask'].squeeze(0)
+        encoded_bow_sample = self.tokenizer(bow_sample_str, padding="max_length", add_special_tokens=True, truncation=True, max_length=self.max_length, return_tensors="pt")['input_ids'].squeeze(0)
+        encoded_bow_attention_mask = self.tokenizer(bow_sample_str, padding="max_length", add_special_tokens=True, truncation=True, max_length=self.max_length, return_tensors="pt")['attention_mask'].squeeze(0)
 
         is_sup_tensor = torch.tensor(self.is_sup[index])
 

@@ -12,6 +12,7 @@ def generate_dataloader(
     train_batch_size: int,
     valid_batch_size: int,
     test_batch_size: int,
+    max_length: int=1000,
     use_bow_dataset: bool = False,
     random_seed: int = 42,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
@@ -51,16 +52,16 @@ def generate_dataloader(
     train_texts, train_labels = preprocess_data(train_df)
     valid_texts, valid_labels = preprocess_data(valid_df)
     test_texts, test_labels = preprocess_data(test_df)
-    
+
     # Create Dataset objects based on the value of use_bow_dataset
     if use_bow_dataset:
-        train_dataset = GanBertBagOfWordsDataset(tokenizer, train_texts, train_labels, unsupervised_ratio)
-        valid_dataset = GanBertBagOfWordsDataset(tokenizer, valid_texts, valid_labels, unsupervised_ratio)
-        test_dataset = GanBertBagOfWordsDataset(tokenizer, test_texts, test_labels,  unsupervised_ratio)
+        train_dataset = GanBertBagOfWordsDataset(tokenizer, train_texts, train_labels, unsupervised_ratio, max_length)
+        valid_dataset = GanBertBagOfWordsDataset(tokenizer, valid_texts, valid_labels, unsupervised_ratio, max_length)
+        test_dataset = GanBertBagOfWordsDataset(tokenizer, test_texts, test_labels,  unsupervised_ratio, max_length)
     else:
-        train_dataset = GanBertDataset(tokenizer, train_texts, train_labels, unsupervised_ratio)
-        valid_dataset = GanBertDataset(tokenizer, valid_texts, valid_labels, unsupervised_ratio)
-        test_dataset = GanBertDataset(tokenizer, test_texts, test_labels, unsupervised_ratio)
+        train_dataset = GanBertDataset(tokenizer, train_texts, train_labels, unsupervised_ratio, max_length)
+        valid_dataset = GanBertDataset(tokenizer, valid_texts, valid_labels, unsupervised_ratio, max_length)
+        test_dataset = GanBertDataset(tokenizer, test_texts, test_labels, unsupervised_ratio, max_length)
 
     # Create DataLoader objects
     train_dataloader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True)
