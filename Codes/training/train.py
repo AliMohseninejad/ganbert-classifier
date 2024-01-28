@@ -54,7 +54,8 @@ def train_vanilla_classier(
 
     optimizer = optim.Optimizer([{'params': transformer.parameters()}, {'params': classifier.parameters()}])
 
-    loss_function = nn.CrossEntropyLoss()
+    loss_function_train = nn.CrossEntropyLoss()
+    loss_function_validation = nn.CrossEntropyLoss()
     
     results    = []
     best_loss  = float('inf')
@@ -113,7 +114,7 @@ def train_vanilla_classier(
             one_hot_predictions   = F.one_hot(predictions)
             one_hot_labels        = labels[supervised_indices]
 
-            loss = loss_function (one_hot_predictions, one_hot_labels)
+            loss = loss_function_train (one_hot_predictions, one_hot_labels)
             loss.backward()
             optimizer.step()
 
@@ -158,6 +159,8 @@ def train_vanilla_classier(
                 one_hot_predictions   = F.one_hot(predictions)
                 one_hot_labels        = labels[supervised_indices]
                 
+                loss = loss_function_validation (one_hot_predictions, one_hot_labels)
+
                 validation_loss        += loss
                 validation_data_count  += one_hot_labels.size(0)
                 validation_corrects    += correct_predictions_d   
@@ -215,8 +218,6 @@ def train_gan(
     bow_mode                   : bool                       ,
     generator_optimizer        : optim.Optimizer            ,
     discriminator_optimizer    : optim.Optimizer            ,
-    generator_loss_function    : GeneratorLossFunction      ,
-    discriminator_loss_function: DiscriminatorLossFunction  ,
     epochs                     : int                        ,
     generator_scheduler        : Union[LRScheduler, None]   ,
     discriminator_scheduler    : Union[LRScheduler, None]   ,
@@ -237,9 +238,6 @@ def train_gan(
         a Generator model.
         generator_optimizer (optim.Optimizer): The Generator optimizer
         discriminator_optimizer (optim.Optimizer): The Discriminator optimizer
-        generator_loss_function (GeneratorLossFunction): The generator loss function
-        discriminator_loss_function (DiscriminatorLossFunction): The
-        discriminator loss function
         epochs (int): number of training epochs
         generator_scheduler (Union[LRScheduler, None]): The Generator learning
         rate scheduler. No scheduler if None.
@@ -264,8 +262,13 @@ def train_gan(
     best_epoch = 0
     device     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    generator_loss_function     = GeneratorLossFunction()
-    discriminator_loss_function = DiscriminatorLossFunction()
+    #---------------------------------------------------------------------
+    generator_loss_function_train          = GeneratorLossFunction()
+    discriminator_loss_function_train      = DiscriminatorLossFunction()
+
+    generator_loss_function_validation     = GeneratorLossFunction()
+    discriminator_loss_function_validation = DiscriminatorLossFunction()
+    #---------------------------------------------------------------------
     
     generator.to(device)
     discriminator.to(device)
@@ -375,8 +378,8 @@ def train_gan(
             Discriminator_fake_probability = probability_list[1]
             #--------------------------------------------------------------------------
             
-            discriminator_loss = discriminator_loss_function(labels, supervised_indices, unsupervised_indices, Discriminator_real_probability, Discriminator_fake_probability) 
-            generator_loss     = generator_loss_function(generator_outputs, Discriminator_real_features, Discriminator_fake_features)
+            discriminator_loss = discriminator_loss_function_train(labels, supervised_indices, unsupervised_indices, Discriminator_real_probability, Discriminator_fake_probability) 
+            generator_loss     = generator_loss_function_train(generator_outputs, Discriminator_real_features, Discriminator_fake_features)
             
             generator_loss.backward(retain_graph=True)
             generator_optimizer.step()
@@ -476,12 +479,11 @@ def train_gan(
                 Discriminator_fake_probability = probability_list[1]
                 #--------------------------------------------------------------------------
 
-                discriminator_loss = discriminator_loss_function(labels, supervised_indices, unsupervised_indices, Discriminator_real_probability, Discriminator_fake_probability) 
-                generator_loss     = generator_loss_function(generator_outputs, Discriminator_real_features, Discriminator_fake_features)
+                discriminator_loss = discriminator_loss_function_validation(labels, supervised_indices, unsupervised_indices, Discriminator_real_probability, Discriminator_fake_probability) 
+                generator_loss     = generator_loss_function_validation(generator_outputs, Discriminator_real_features, Discriminator_fake_features)
 
-                
 
-                validation_loss  += (generator_loss.item() + discriminator_loss.item())
+                validation_loss        += (generator_loss.item() + discriminator_loss.item())
                 validation_data_count  += one_hot_labels.size(0)
                 validation_corrects    += correct_predictions_d   
                 validation_predictions_f1.extend(one_hot_predictions.cpu())
