@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-def plot_results(results):
+def plot_results(results, title_suffix):
     epochs              = [result["epoch"]                                   for result in results]
     train_loss          = [result["train_loss"].detach().cpu().numpy()       for result in results]
     validation_loss     = [result["validation_loss"].detach().cpu().numpy()  for result in results]
@@ -14,7 +14,7 @@ def plot_results(results):
     plt.subplot(1, 3, 1)
     plt.plot(epochs, train_loss     , label='Train Loss'     , marker='o', linestyle='--', color= "#f70d1a", linewidth=2) #vivid red
     plt.plot(epochs, validation_loss, label='Validation Loss', marker='o', linestyle='--', color= "#002147", linewidth=2) #oxford blue
-    plt.title('Training and Validation Loss')
+    plt.title('Training and Validation Loss' + title_suffix)
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
@@ -25,7 +25,7 @@ def plot_results(results):
     plt.subplot(1, 3, 2)
     plt.plot(epochs, train_accuracy     , label='Train Accuracy'     , marker='o', linestyle='-', color="#f70d1a", linewidth=2) #vivid red
     plt.plot(epochs, validation_accuracy, label='Validation Accuracy', marker='o', linestyle='-', color="#002147", linewidth=2) #oxford blue
-    plt.title('Training and Validation Accuracy')
+    plt.title('Training and Validation Accuracy' + title_suffix)
     plt.xlabel('Epochs')
     plt.ylabel('Accuracy')
     plt.legend()
@@ -36,7 +36,7 @@ def plot_results(results):
     plt.subplot(1, 3, 3)
     plt.plot(epochs, train_f1     , label='Train F1 Score'     , marker='o', linestyle='-', color="#f70d1a", linewidth=2) #vivid red
     plt.plot(epochs, validation_f1, label='Validation F1 Score', marker='o', linestyle='-', color="#002147", linewidth=2) #oxford blue
-    plt.title('Training and Validation F1 score')
+    plt.title('Training and Validation F1 score' + title_suffix)
     plt.xlabel('Epochs')
     plt.ylabel('F1 score')
     plt.legend()
