@@ -87,7 +87,7 @@ def train_vanilla_classier(
         classifier.train()
         transformer.train()
 
-        for batch_i,batch in tqdm(enumerate(train_dataloader), total = len(train_dataloader):
+        for batch_i,batch in tqdm(enumerate(train_dataloader), total = len(train_dataloader)):
             
             optimizer.zero_grad()
 
