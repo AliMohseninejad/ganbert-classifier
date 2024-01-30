@@ -401,8 +401,6 @@ def train_gan(
             predictions_f1.extend(one_hot_predictions.detach().cpu().max(1)[1])
             true_labels_f1.extend(one_hot_labels.detach().cpu().max(1)[1])
 
-            print("corrects:" , corrects , "in batch :" , batch)
-
         train_loss       /= len(train_dataloader)
         train_accuracy    = corrects / data_count
         true_labels_f1_np = np.array(true_labels_f1)
