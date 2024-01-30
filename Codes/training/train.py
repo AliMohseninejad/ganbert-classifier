@@ -258,7 +258,7 @@ def train_gan(
         discriminator_path (str): The path to the folder where discriminator should be saved
 
     Returns:
-        Tuple[BertModel, Generator1, Discriminator, List[Dict[str, float]]]: A
+        Tuple[BertModel, Generator, Discriminator, List[Dict[str, float]]]: A
         tuple containing the trained BERT model, The trained Generator, the
         trained Discriminator and a list of results.  Each element of the list
         is a dictionary containing train loss per epoch, validation loss per
@@ -319,21 +319,22 @@ def train_gan(
             encoded_input          = batch[0].to(device)
             encoded_attention_mask = batch[1].to(device)
             labels                 = batch[2].to(device)
-            is_supervised          = batch[3].to(device)
+            is_supervised          = batch[3].numpy().tolist()
             if bow_mode:
                 encoded_bow = batch[4].to(device)
                 encoded_bow_attention = batch[5].to(device)
 
-            supervised_indices   = torch.nonzero(is_supervised == 1).squeeze()
-            unsupervised_indices = torch.nonzero(is_supervised == 0).squeeze()
+            supervised_indices = [item for item in is_supervised if item == 1]
+            #supervised_indices   = torch.nonzero(is_supervised == 1).squeeze()
+            unsupervised_indices = [item for item in is_supervised if item == 0]
+            #unsupervised_indices = torch.nonzero(is_supervised == 0).squeeze()
             real_batch_size = encoded_input.shape[0]
-
             # Encode real data in the Transformer
             model_outputs = transformer(encoded_input, attention_mask=encoded_attention_mask)
             hidden_states = model_outputs[-1]
 
             # Define noise_size as the same size as the encoded_input
-            noise_size = encoded_input.shape[1]
+            noise_size = 100
 
             noise = torch.zeros((real_batch_size, noise_size), device=device).uniform_(0, 1)
 
@@ -341,23 +342,27 @@ def train_gan(
 
             # Train Generator
             if bow_mode:
-                generator_outputs = transformer(encoded_bow, attention_mask=encoded_bow_attention)
+                generator_outputs = transformer(encoded_bow, attention_mask=encoded_bow_attention)[-1]
             else:
                 generator_outputs = generator(noise)
+
+            print('====================')
+            print("\n generator_outputs" , generator_outputs)
+            print('====================')
 
             #------------------------------------
 
             # Train Discriminator
             discriminator_input = torch.cat([generator_outputs, hidden_states], dim=0)
-
-            features, logits, probabilities = discriminator(discriminator_input[-1])
-
+            features, logits, probabilities = discriminator(discriminator_input)
             # Calculate the number of correct predictions for real and fake examples
             fake_predictions = probabilities[:real_batch_size]
             real_predictions = probabilities[real_batch_size:]
 
             #------------------------------------------------
-            if supervised_indices.shape[0] != 0 :
+            #if supervised_indices.shape[0] != 0 :
+            if len(supervised_indices) != 0 :
+
                 real_prediction_supervised = real_predictions[supervised_indices]
                 sup_fake_probabilities     = torch.cat([ fake_predictions, real_prediction_supervised], dim=0)
                 _, predictions             = sup_fake_probabilities.max(1)
@@ -389,10 +394,10 @@ def train_gan(
 
             discriminator_loss = discriminator_loss_function_train(labels, supervised_indices, unsupervised_indices, Discriminator_real_probability, Discriminator_fake_probability)
             generator_loss     = generator_loss_function_train(generator_outputs, Discriminator_real_features, Discriminator_fake_features)
-
+            print("gen loss", generator_loss)
             generator_loss.backward(retain_graph=True)
-            generator_optimizer.step()
             discriminator_loss.backward()
+            generator_optimizer.step()
             discriminator_optimizer.step()
 
             train_loss  += (generator_loss.item() + discriminator_loss.item())
@@ -421,7 +426,7 @@ def train_gan(
                 encoded_input          = batch[0].to(device)
                 encoded_attention_mask = batch[1].to(device)
                 labels                 = batch[2].to(device)
-                is_supervised          = batch[3].to(device)
+                is_supervised          = batch[3].numpy().tolist()
                 if bow_mode:
                     encoded_bow = batch[4].to(device)
                     encoded_bow_attention = batch[5].to(device)
@@ -443,23 +448,31 @@ def train_gan(
 
                 # Train Generator
                 if bow_mode:
-                    generator_outputs = transformer(encoded_bow, attention_mask=encoded_bow_attention)
+                    generator_outputs = transformer(encoded_bow, attention_mask=encoded_bow_attention)[-1]
                 else:
                     generator_outputs = generator(noise)
+
+
+                print('====================')
+                print("\n generator_outputs" , generator_outputs)
+                print('====================')
 
                 #------------------------------------
 
                 # Train Discriminator
                 discriminator_input = torch.cat([generator_outputs, hidden_states], dim=0)
 
-                features, logits, probabilities = discriminator(discriminator_input[-1])
+                features, logits, probabilities = discriminator(discriminator_input)
 
                 # Calculate the number of correct predictions for real and fake examples
                 fake_predictions = probabilities[:real_batch_size]
                 real_predictions = probabilities[real_batch_size:]
-
+                print('====================')
+                print("\n generator_outputs" , generator_outputs)
+                print('====================')
                 #------------------------------------------------
-                if supervised_indices.shape[0] != 0 :
+                #if supervised_indices.shape[0] != 0 :
+                if len(supervised_indices) != 0 :
                     real_prediction_supervised = real_predictions[supervised_indices]
                     sup_fake_probabilities = torch.cat([fake_predictions, real_prediction_supervised], dim=0)
                     _, predictions = sup_fake_probabilities.max(1)
