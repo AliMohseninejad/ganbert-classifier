@@ -1,3 +1,4 @@
+from model.bert import get_bert_model
 from model.discriminator import Discriminator
 from model.generator1 import Generator
 from typing import *
@@ -10,16 +11,26 @@ import torch.optim as optim
 import torch.nn as nn
 import torch
 import numpy as np
+import random
 
 
 def test_vanilla_bert(
-    transformer: BertModel,
-    generator: Union[Generator, BertModel],
-    discriminator: Discriminator,
+    bert_model_name: str,
+    transformer_path: str,
+    discriminator_path: str,
     test_dataloader: DataLoader,
 ):
-    discriminator.eval()
+    random.seed(42)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    transformer, _ = get_bert_model(bert_model_name)
+    transformer.load_state_dict(torch.load(transformer_path))
+    transformer.to(device)
     transformer.eval()
+    discriminator = Discriminator()
+    discriminator.load_state_dict(torch.load(discriminator_path))
+    discriminator.to(device)
+    discriminator.eval()
 
     test_corrects = 0.0
     test_data_count = 0.0
@@ -30,10 +41,10 @@ def test_vanilla_bert(
     with torch.no_grad():
         for batch in test_dataloader:
             # Unpack this training batch from our dataloader.
-            encoded_input = batch[0]
-            encoded_attention_mask = batch[1]
-            labels = batch[2]
-            is_supervised = batch[3]
+            encoded_input = batch[0].to(device)
+            encoded_attention_mask = batch[1].to(device)
+            labels = batch[2].to(device)
+            is_supervised = batch[3].to(device)
 
             supervised_indices = torch.nonzero(is_supervised == 1).squeeze()
 
@@ -70,12 +81,32 @@ def test_vanilla_bert(
 
 
 def test_gan_bert(
-    transformer: BertModel,
-    generator: Union[Generator, BertModel],
-    discriminator: Discriminator,
+    bert_model_name: str,
+    transformer_path: str,
+    generator_path: str,
+    discriminator_path: str,
     bow_mode: bool,
     test_dataloader: DataLoader,
 ):
+    random.seed(42)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    transformer, _ = get_bert_model(bert_model_name)
+    transformer.load_state_dict(torch.load(transformer_path))
+    transformer.to(device)
+    transformer.eval()
+    discriminator = Discriminator()
+    discriminator.load_state_dict(torch.load(discriminator_path))
+    discriminator.to(device)
+    discriminator.eval()
+    if bow_mode:
+        generator, _ = get_bert_model(bert_model_name)
+    else:
+        generator = Generator()
+    generator.load_state_dict(torch.load(generator_path))
+    generator.to(device)
+    generator.eval()
+
     test_corrects = 0.0
     test_data_count = 0.0
 
@@ -90,13 +121,13 @@ def test_gan_bert(
     with torch.no_grad():
         for batch in test_dataloader:
             # Unpack this training batch from our dataloader.
-            encoded_input = batch[0]
-            encoded_attention_mask = batch[1]
-            labels = batch[2]
-            is_supervised = batch[3]
+            encoded_input = batch[0].to(device)
+            encoded_attention_mask = batch[1].to(device)
+            labels = batch[2].to(device)
+            is_supervised = batch[3].to(device)
             if bow_mode:
-                encoded_bow = batch[4]
-                encoded_bow_attention = batch[5]
+                encoded_bow = batch[4].to(device)
+                encoded_bow_attention = batch[5].to(device)
 
             supervised_indices = torch.nonzero(is_supervised == 1).squeeze()
             unsupervised_indices = torch.nonzero(is_supervised == 0).squeeze()
