@@ -61,34 +61,19 @@ class GanBertBagOfWordsDataset(Dataset):
         self.texts = texts
         self.labels = labels
         self.sample_length = 100
-        self.vocabulary = self._create_vocabulary()
+        self.words = ' '.join(self.texts).split()
         self.max_length = max_length
         self.is_sup = [0 if random.random() < unsupervised_ratio else 1 for _ in range(len(self.labels))]
 
     def __len__(self) -> int:
         return len(self.texts)
 
-    def _create_vocabulary(self):
-        """Create vocabulary based on the texts"""
-        words = ' '.join(self.texts).split()
-        return list(set(words))
+    def _generate_bag_of_words_sample(self, k) -> str:    
+            
+        sampled_words = random.sample(self.words, k)
+        sampled_text = ' '.join(sampled_words)
 
-    def _generate_bag_of_words_sample(self, text: str) -> str:
-        """Generate random Bag of Words sample based on text"""
-        # Count the frequency of words in the text
-        word_counts = Counter(text.split())
-        
-        # Normalize word frequencies to get probabilities
-        total_words = sum(word_counts.values())
-        word_probs = {word: count / total_words for word, count in word_counts.items()}
-        
-        # Sample words from the vocabulary based on their frequencies
-        sampled_words = random.choices(self.vocabulary, weights=[word_probs.get(word, 0) for word in self.vocabulary], k=self.sample_length)
-        
-        # Create BoW sample as a string
-        bow_sample_str = ' '.join(sampled_words)
-
-        return bow_sample_str
+        return sampled_text
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
@@ -114,7 +99,8 @@ class GanBertBagOfWordsDataset(Dataset):
         label_tensor = torch.nn.functional.one_hot(label, num_classes=num_classes).float()
 
         # Generate Bag of Words sample
-        bow_sample_str = self._generate_bag_of_words_sample(text)
+        k = 256
+        bow_sample_str = self._generate_bag_of_words_sample(k)
         
         # Tokenize BoW sample
         encoded_bow_sample = self.tokenizer(bow_sample_str, padding="max_length", add_special_tokens=True, truncation=True, max_length=self.max_length, return_tensors="pt")['input_ids'].squeeze(0)

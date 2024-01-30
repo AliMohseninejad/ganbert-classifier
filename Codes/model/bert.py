@@ -7,7 +7,6 @@ from transformers import (
     AutoConfig,
 )
 from typing import *
-from transformers.adapters.composition import Fuse
 
 def get_bert_model(model_name: str = "bert-base-cased") -> Tuple[BertModel, BertConfig]:
     """Get the Bert pre-trained model. The model should be configured here.
@@ -25,7 +24,7 @@ def get_bert_model(model_name: str = "bert-base-cased") -> Tuple[BertModel, Bert
     return (transformer, config)
 
 
-def get_bert_model_with_adapter(model_name: str = "bert-base-cased") -> BertModel:
+def get_bert_model_with_adapter(model_name: str = "bert-base-cased") -> Tuple[BertModel, BertConfig]:
     """Get the Bert pre-trained model. The model should be configured here.
 
     Args:
