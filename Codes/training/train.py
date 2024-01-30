@@ -6,6 +6,7 @@ from   torch.optim.lr_scheduler import LRScheduler
 from   transformers             import BertModel
 from   torch.utils.data         import DataLoader
 from   sklearn.metrics          import f1_score
+from   tqdm                     import tqdm
 import torch.nn.functional      as F
 import torch.optim              as optim
 import torch.nn                 as nn
@@ -86,8 +87,8 @@ def train_vanilla_classier(
         classifier.train()
         transformer.train()
 
-        for batch_i,batch in enumerate(train_dataloader):
-
+        for batch_i,batch in tqdm(enumerate(train_dataloader)):
+            
             optimizer.zero_grad()
 
             # Unpack this training batch from our dataloader.
@@ -310,7 +311,7 @@ def train_gan(
         transformer.train()
 
         #train
-        for batch_i, batch in enumerate(train_dataloader):
+        for batch_i, batch in tqdm(enumerate(train_dataloader)):
 
             generator_optimizer.zero_grad()
             discriminator_optimizer.zero_grad()
