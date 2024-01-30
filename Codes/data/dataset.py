@@ -11,7 +11,7 @@ class GanBertDataset(Dataset):
     model
     """
 
-    def __init__(self, tokenizer: BertTokenizer, texts: List[str], labels: List[int], unsupervised_ratio: float, max_length):
+    def __init__(self, tokenizer: BertTokenizer, texts: List[str], labels: List[int], unsupervised_ratio: float, max_length, use_unsup):
         random.seed(42)      
         self.tokenizer = tokenizer
         self.texts = texts
@@ -39,7 +39,9 @@ class GanBertDataset(Dataset):
         label = torch.tensor(self.labels[index])
 
         # Convert label to one-hot tensor
-        num_classes = len(set(self.labels))+1
+        num_classes = len(set(self.labels))
+        if use_unsup:
+            num_classes = num_classes+1
         label_tensor = torch.nn.functional.one_hot(label, num_classes=num_classes).float()
         is_sup_tensor = torch.tensor(self.is_sup[index])
 

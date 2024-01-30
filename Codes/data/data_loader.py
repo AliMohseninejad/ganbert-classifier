@@ -65,9 +65,9 @@ def generate_dataloader(
         valid_dataset = GanBertBagOfWordsDataset(tokenizer, valid_texts, valid_labels, unsupervised_ratio, max_length)
         test_dataset = GanBertBagOfWordsDataset(tokenizer, test_texts, test_labels,  unsupervised_ratio, max_length)
     else:
-        train_dataset = GanBertDataset(tokenizer, train_texts, train_labels, unsupervised_ratio, max_length)
-        valid_dataset = GanBertDataset(tokenizer, valid_texts, valid_labels, unsupervised_ratio, max_length)
-        test_dataset = GanBertDataset(tokenizer, test_texts, test_labels, unsupervised_ratio, max_length)
+        train_dataset = GanBertDataset(tokenizer, train_texts, train_labels, unsupervised_ratio, max_length, use_unsup)
+        valid_dataset = GanBertDataset(tokenizer, valid_texts, valid_labels, unsupervised_ratio, max_length, use_unsup)
+        test_dataset = GanBertDataset(tokenizer, test_texts, test_labels, unsupervised_ratio, max_length, use_unsup)
 
     # Create DataLoader objects
     train_dataloader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True)
