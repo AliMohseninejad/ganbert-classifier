@@ -17,6 +17,7 @@ class GanBertDataset(Dataset):
         self.texts = texts
         self.labels = labels
         self.max_length = max_length
+        self.use_unsup = use_unsup
         self.is_sup = [0 if random.random() < unsupervised_ratio else 1 for _ in range(len(self.labels))]
 
     def __len__(self) -> int:
@@ -40,7 +41,7 @@ class GanBertDataset(Dataset):
 
         # Convert label to one-hot tensor
         num_classes = len(set(self.labels))
-        if use_unsup:
+        if self.use_unsup:
             num_classes = num_classes+1
         label_tensor = torch.nn.functional.one_hot(label, num_classes=num_classes).float()
         is_sup_tensor = torch.tensor(self.is_sup[index])
