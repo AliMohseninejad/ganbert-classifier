@@ -109,7 +109,8 @@ class GanBertBagOfWordsDataset(Dataset):
 
 
         # Convert label to one-hot tensor
-        num_classes = len(set(self.labels))+1
+        #num_classes = len(set(self.labels))+1
+        num_classes = 7
         label_tensor = torch.nn.functional.one_hot(label, num_classes=num_classes).float()
 
         # Generate Bag of Words sample
