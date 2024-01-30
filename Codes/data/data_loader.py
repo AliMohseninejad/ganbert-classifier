@@ -39,8 +39,7 @@ def generate_dataloader(
     """
     # Set random seed
     random.seed(random_seed)
-    torch.manual_seed(random_seed)
-
+ 
     # Read train, validation, and test data from JSON lines files
     train_df = pd.read_json(dataset_folder_path + "subtaskB_train.jsonl", lines=True)
     test_df = pd.read_json(dataset_folder_path + "subtaskB_dev.jsonl", lines=True)
