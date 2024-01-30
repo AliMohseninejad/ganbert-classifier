@@ -4,6 +4,8 @@ from torch.utils.data import DataLoader
 from transformers import BertTokenizer
 from sklearn.model_selection import train_test_split
 from data.dataset import *
+import random
+import pandas as pd 
 
 def generate_dataloader(
     dataset_folder_path: str,
@@ -12,6 +14,7 @@ def generate_dataloader(
     train_batch_size: int,
     valid_batch_size: int,
     test_batch_size: int,
+    use_unsup: bool,
     max_length: int=1000,
     use_bow_dataset: bool = False,
     random_seed: int = 42,
@@ -41,6 +44,9 @@ def generate_dataloader(
     # Read train, validation, and test data from JSON lines files
     train_df = pd.read_json(dataset_folder_path + "subtaskB_train.jsonl", lines=True)
     test_df = pd.read_json(dataset_folder_path + "subtaskB_dev.jsonl", lines=True)
+    if not use_unsup:
+        train_df, _ =  train_test_split(train_df, train_size=1-unsupervised_ratio)
+        unsupervised_ratio = 0
     train_df, valid_df = train_test_split(train_df, test_size=0.1)
 
     # Preprocess data
