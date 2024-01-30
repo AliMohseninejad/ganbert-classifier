@@ -40,7 +40,8 @@ class GanBertDataset(Dataset):
         label = torch.tensor(self.labels[index])
 
         # Convert label to one-hot tensor
-        num_classes = len(set(self.labels))
+        #num_classes = len(set(self.labels))
+        num_classes = 6
         if self.use_unsup:
             num_classes = num_classes+1
         label_tensor = torch.nn.functional.one_hot(label, num_classes=num_classes).float()
