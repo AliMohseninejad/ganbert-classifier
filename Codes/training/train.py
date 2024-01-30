@@ -1,5 +1,5 @@
 from   model.discriminator      import Discriminator
-from   model.generator1         import Generator
+from   model.generator1         import Generator1
 from   training.loss            import GeneratorLossFunction, DiscriminatorLossFunction
 from   typing                   import *
 from   torch.optim.lr_scheduler import LRScheduler
@@ -221,7 +221,7 @@ def train_vanilla_classier(
 
 def train_gan(
     transformer                : BertModel                  ,
-    generator                  : Union[Generator, BertModel],
+    generator                  : Union[Generator1, BertModel],
     discriminator              : Discriminator              ,
     bow_mode                   : bool                       ,
     generator_optimizer        : optim.Optimizer            ,
@@ -234,13 +234,13 @@ def train_gan(
     generator_path             : str                        ,
     transformer_path           : str                        ,
     discriminator_path         : str                        ,
-) -> Tuple[BertModel, Generator, Discriminator, List[Dict[str, float]]]:
+) -> Tuple[BertModel, Generator1, Discriminator, List[Dict[str, float]]]:
     """Main function to train the BERT-GAN model. In this code, the model is
     trained and validated. In the end the best model is saved on disk.
 
     Args:
         transformer (BertModel): The pre-trained BERT model
-        generator (Generator): The Generator model
+        generator (Generator1): The Generator model
         discriminator (Discriminator): The Discriminator model
         bow_mode (bool): If True, The generator is a BERT model. Otherwise it is
         a Generator model.
@@ -258,7 +258,7 @@ def train_gan(
         discriminator_path (str): The path to the folder where discriminator should be saved
 
     Returns:
-        Tuple[BertModel, Generator, Discriminator, List[Dict[str, float]]]: A
+        Tuple[BertModel, Generator1, Discriminator, List[Dict[str, float]]]: A
         tuple containing the trained BERT model, The trained Generator, the
         trained Discriminator and a list of results.  Each element of the list
         is a dictionary containing train loss per epoch, validation loss per

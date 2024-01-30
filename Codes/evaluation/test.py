@@ -1,6 +1,6 @@
 from model.bert import get_bert_model
 from model.discriminator import Discriminator
-from model.generator1 import Generator
+from model.generator1 import Generator1
 from typing import *
 from torch.optim.lr_scheduler import LRScheduler
 from transformers import BertModel
@@ -101,7 +101,7 @@ def test_gan_bert(
     if bow_mode:
         generator, _ = get_bert_model(bert_model_name)
     else:
-        generator = Generator()
+        generator = Generator1()
     generator.load_state_dict(torch.load(generator_path))
     generator.to(device)
     generator.eval()
@@ -143,7 +143,7 @@ def test_gan_bert(
 
             noise = torch.zeros((real_batch_size, noise_size)).uniform_(0, 1)
 
-            # Train Generator
+            # Train Generator1
             if bow_mode:
                 generator_outputs = transformer(
                     encoded_bow, attention_mask=encoded_bow_attention

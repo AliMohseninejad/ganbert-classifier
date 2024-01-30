@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 
-class Generator(nn.Module):
+class Generator1(nn.Module):
     """Implement the generator model discussed in the paper"""
     def __init__(self, noise_size=100, output_size=768, hidden_size=768, dropout_rate=0.1):
-        super(Generator, self).__init__()
+        super(Generator1, self).__init__()
         layers = []
         hidden_sizes = [noise_size, hidden_size]
         for i in range(len(hidden_sizes)-1):
