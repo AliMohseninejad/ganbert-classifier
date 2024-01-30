@@ -27,7 +27,7 @@ def test_vanilla_bert(
     transformer.load_state_dict(torch.load(transformer_path))
     transformer.to(device)
     transformer.eval()
-    discriminator = Discriminator()
+    discriminator = Discriminator(num_labels = 6)
     discriminator.load_state_dict(torch.load(discriminator_path))
     discriminator.to(device)
     discriminator.eval()
@@ -41,40 +41,39 @@ def test_vanilla_bert(
     with torch.no_grad():
         for batch in test_dataloader:
             # Unpack this training batch from our dataloader.
-            encoded_input = batch[0].to(device)
-            encoded_attention_mask = batch[1].to(device)
-            labels = batch[2].to(device)
-            is_supervised = batch[3].to(device)
+            encoded_input           = batch[0].to(device)
+            encoded_attention_mask  = batch[1].to(device)
+            labels                  = batch[2].to(device)
+            is_supervised           = batch[3].to(device)
 
             supervised_indices = torch.nonzero(is_supervised == 1).squeeze()
 
             model_outputs = transformer(
                 encoded_input, attention_mask=encoded_attention_mask
             )
-            features, logits, probabilities = discriminator(model_outputs)
+            features, logits, probabilities = discriminator(model_outputs[-1])
 
             if supervised_indices.shape[0] != 0:
                 real_prediction_supervised = probabilities[supervised_indices]
                 _, predictions = real_prediction_supervised.max(1)
-                correct_predictions_d = (
-                    predictions.eq(labels[supervised_indices].max(1)).sum().item()
-                )
+                _, labels_max = labels[supervised_indices].max(1)
+                correct_predictions_d = predictions.eq(labels_max).sum().item()
             else:
                 correct_predictions_d = torch.zeros((1,))
 
-            one_hot_predictions = F.one_hot(predictions)
+            one_hot_predictions = F.one_hot(predictions, num_classes=6).float()
             one_hot_labels = labels[supervised_indices]
 
             test_data_count += one_hot_labels.size(0)
             test_corrects += correct_predictions_d
-            test_predictions_f1.extend(one_hot_predictions.cpu())
-            test_true_labels_f1.extend(one_hot_labels.cpu())
+            test_predictions_f1.extend(one_hot_predictions.detach().cpu().max(1)[1])
+            test_true_labels_f1.extend(one_hot_labels.detach().cpu().max(1)[1])
 
         test_accuracy = test_corrects / test_data_count
         test_true_labels_f1_np = np.array(test_true_labels_f1)
         test_predictions_f1_np = np.array(test_predictions_f1)
         test_f1 = f1_score(
-            test_true_labels_f1_np, test_predictions_f1_np, average="binary"
+            test_true_labels_f1_np, test_predictions_f1_np, average="micro"
         )
     print(f"Test Accuracy equals: {test_accuracy}")
     print(f"Test f1 score equals: {test_f1}")
