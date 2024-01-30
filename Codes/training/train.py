@@ -49,8 +49,8 @@ def train_vanilla_classier(
         epoch, validation loss per epoch, train accuracy, val accuracy, ...
     """
     random.seed(42)
-    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device = 'cpu'
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = 'cpu'
     transformer.to(device)
     classifier.to(device)
 
@@ -268,8 +268,8 @@ def train_gan(
     results    = []
     best_loss  = float('inf')
     best_epoch = 0
-    #device     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device = 'cpu'
+    device     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = 'cpu'
 
     #---------------------------------------------------------------------
     generator_loss_function_train          = GeneratorLossFunction()
