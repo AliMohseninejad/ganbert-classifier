@@ -125,9 +125,9 @@ def train_vanilla_classier(
                 predictions_f1.extend(one_hot_predictions.detach().cpu().max(1)[1])
                 true_labels_f1.extend(one_hot_labels.detach().cpu().max(1)[1])
 
-            print("============================================")
-            print("corrects:" , corrects , "data_count:", data_count, "in batch :" , batch_i, "out of", str(len(train_dataloader)))
-            print("============================================")
+            #print("============================================")
+            #print("corrects:" , corrects , "data_count:", data_count, "in batch :" , batch_i, "out of", str(len(train_dataloader)))
+            #print("============================================")
 
         train_loss       /= len(train_dataloader)
         train_accuracy    = corrects / data_count
@@ -346,10 +346,6 @@ def train_gan(
             else:
                 generator_outputs = generator(noise)
 
-            print('====================')
-            print("\n generator_outputs" , generator_outputs)
-            print('====================')
-
             #------------------------------------
 
             # Train Discriminator
@@ -394,7 +390,6 @@ def train_gan(
 
             discriminator_loss = discriminator_loss_function_train(labels, supervised_indices, unsupervised_indices, Discriminator_real_probability, Discriminator_fake_probability)
             generator_loss     = generator_loss_function_train(generator_outputs, Discriminator_real_features, Discriminator_fake_features)
-            print("gen loss", generator_loss)
             generator_loss.backward(retain_graph=True)
             discriminator_loss.backward()
             generator_optimizer.step()
@@ -453,10 +448,6 @@ def train_gan(
                     generator_outputs = generator(noise)
 
 
-                print('====================')
-                print("\n generator_outputs" , generator_outputs)
-                print('====================')
-
                 #------------------------------------
 
                 # Train Discriminator
@@ -467,9 +458,7 @@ def train_gan(
                 # Calculate the number of correct predictions for real and fake examples
                 fake_predictions = probabilities[:real_batch_size]
                 real_predictions = probabilities[real_batch_size:]
-                print('====================')
-                print("\n generator_outputs" , generator_outputs)
-                print('====================')
+
                 #------------------------------------------------
                 #if supervised_indices.shape[0] != 0 :
                 if len(supervised_indices) != 0 :

@@ -25,11 +25,9 @@ class GeneratorLossFunction(nn.Module):
         self, generator_outputs, Discriminator_real_features, Discriminator_fake_features
     ):
         Loss_G_Unsupervised  = -torch.mean(torch.log(1 - generator_outputs[:, -1] + 1e-8)) #[:, -1] is used to extract the probabilities of the "extra" or "fake" class from the gen_probs tensor.
-        print("Loss_G_Unsupervised", Loss_G_Unsupervised)
         #-------------------------------------------------------------------------------------
         # Feature Matching Loss
         Loss_FeatureMatching = torch.mean(torch.pow(torch.mean(Discriminator_real_features, dim=0) - torch.mean(Discriminator_fake_features, dim=0),2))  # represents the discrepancy between the real and generated feature distributions.
-        print("\nLoss_FeatureMatching",Loss_FeatureMatching)
         #-------------------------------------------------------------------------------------
         #total loss (Generator1)
         Loss_G = Loss_FeatureMatching + Loss_G_Unsupervised
