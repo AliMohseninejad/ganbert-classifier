@@ -56,8 +56,8 @@ def train_vanilla_classier(
     transformer.to(device)
     classifier.to(device)
 
-    loss_function_train = nn.CrossEntropyLoss()
-    loss_function_validation = nn.CrossEntropyLoss()
+    loss_function_train = nn.CrossEntropyLoss(ignore_index=-1)
+    loss_function_validation = nn.CrossEntropyLoss(ignore_index=-1)
 
     results = []
     best_loss = float("inf")
@@ -90,8 +90,6 @@ def train_vanilla_classier(
         for batch_i, batch in tqdm(
             enumerate(train_dataloader), total=len(train_dataloader)
         ):
-            optimizer.zero_grad()
-
             # Unpack this training batch from our dataloader.
             encoded_input = batch[0].to(device)
             encoded_attention_mask = batch[1].to(device)
@@ -111,9 +109,9 @@ def train_vanilla_classier(
             one_hot_predictions = F.one_hot(predictions, num_classes=6).float()
             one_hot_labels = labels
 
-            loss = loss_function_train(
-                one_hot_predictions, one_hot_labels.requires_grad_(True)
-            )
+            loss = loss_function_train(logits, one_hot_labels)
+
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
@@ -136,51 +134,54 @@ def train_vanilla_classier(
         # Validation
         classifier.eval()
         transformer.eval()
+        for batch in validation_dataloader:
+            # Unpack this training batch from our dataloader.
+            encoded_input_val = batch[0].to(device)
+            encoded_attention_mask_val = batch[1].to(device)
+            labels_val = batch[2].to(device)
+            is_supervised_val = batch[3].to(device)
 
-        with torch.no_grad():
-            for batch in validation_dataloader:
-                # Unpack this training batch from our dataloader.
-                encoded_input = batch[0].to(device)
-                encoded_attention_mask = batch[1].to(device)
-                labels = batch[2].to(device)
-                is_supervised = batch[3].to(device)
-
-                model_outputs = transformer(
-                    encoded_input, attention_mask=encoded_attention_mask
+            with torch.no_grad():
+                model_outputs_val = transformer(
+                    encoded_input_val, attention_mask=encoded_attention_mask_val
                 )
-                features, logits, probabilities = classifier(model_outputs[-1])
-
-                real_prediction_supervised = probabilities
-                _, predictions = real_prediction_supervised.max(1)
-                _, labels_max = labels.max(1)
-                correct_predictions_d = predictions.eq(labels_max).sum().item()
-
-                one_hot_predictions = F.one_hot(predictions, num_classes=6).float()
-                one_hot_labels = labels
-
-                loss = loss_function_validation(
-                    one_hot_predictions, one_hot_labels.requires_grad_(True)
+                features_val, logits_val, probabilities_val = classifier(
+                    model_outputs_val[-1]
                 )
 
-                validation_loss += loss
-                validation_data_count += one_hot_labels.size(0)
-                validation_corrects += correct_predictions_d
+                real_prediction_supervised_val = probabilities_val
+                _, predictions_val = real_prediction_supervised_val.max(1)
+                _, labels_max_val = labels_val.max(1)
+                correct_predictions_d_val = (
+                    predictions_val.eq(labels_max_val).sum().item()
+                )
+
+                one_hot_predictions_val = F.one_hot(
+                    predictions_val, num_classes=6
+                ).float()
+                one_hot_labels_val = labels_val
+
+                loss_val = loss_function_validation(logits_val, one_hot_labels_val)
+
+                validation_loss += loss_val
+                validation_data_count += one_hot_labels_val.size(0)
+                validation_corrects += correct_predictions_d_val
                 validation_predictions_f1.extend(
-                    one_hot_predictions.detach().cpu().max(1)[1]
+                    one_hot_predictions_val.detach().cpu().max(1)[1]
                 )
                 validation_true_labels_f1.extend(
-                    one_hot_labels.detach().cpu().max(1)[1]
+                    one_hot_labels_val.detach().cpu().max(1)[1]
                 )
 
-            validation_loss /= len(train_dataloader)
-            validation_accuracy = validation_corrects / validation_data_count
-            validation_true_labels_f1_np = np.array(validation_true_labels_f1)
-            validation_predictions_f1_np = np.array(validation_predictions_f1)
-            validation_f1 = f1_score(
-                validation_true_labels_f1_np,
-                validation_predictions_f1_np,
-                average="micro",
-            )
+        validation_loss /= len(validation_dataloader)
+        validation_accuracy = validation_corrects / validation_data_count
+        validation_true_labels_f1_np = np.array(validation_true_labels_f1)
+        validation_predictions_f1_np = np.array(validation_predictions_f1)
+        validation_f1 = f1_score(
+            validation_true_labels_f1_np,
+            validation_predictions_f1_np,
+            average="micro",
+        )
 
         # Update best model
         if validation_loss < best_loss:
@@ -197,7 +198,7 @@ def train_vanilla_classier(
         # Print progress
         print(
             f"Epoch {epoch + 1}/{epochs}: "
-            f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Train F1: {train_f1:.4f}"
+            f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Train F1: {train_f1:.4f} "
             f"Validation Loss: {validation_loss:.4f}, Validation Accuracy: {validation_accuracy:.4f}, Validation F1: {validation_f1:.4f}"
         )
         print("-----------------------------------------------\n")
