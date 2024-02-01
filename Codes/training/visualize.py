@@ -112,16 +112,12 @@ def plot_results_gan(
 ):
     epochs = [result["epoch"] for result in results]
     train_loss_g = [result["train_loss_g"].detach().cpu().numpy() for result in results]
-    validation_loss_g = [
+    validation_loss = [
         result["validation_loss_g"].detach().cpu().numpy() for result in results
     ]
     train_loss_d = [result["train_loss_d"].detach().cpu().numpy() for result in results]
-    validation_loss_d = [
-        result["validation_loss_d"].detach().cpu().numpy() for result in results
-    ]
-    train_accuracy = [result["train_accuracy"] for result in results]
+
     validation_accuracy = [result["validation_accuracy"] for result in results]
-    train_f1 = [result["train_f1"] for result in results]
     validation_f1 = [result["validation_f1"] for result in results]
     # ----------------------------------------------------------------------------------------------
     # Plot Loss
@@ -138,14 +134,14 @@ def plot_results_gan(
     )  # vivid red
     plt.plot(
         epochs,
-        validation_loss_g,
-        label="Validation Loss G",
+        train_loss_d,
+        label="Train Loss D",
         marker="o",
         linestyle="--",
         color="#002147",
         linewidth=2,
     )  # oxford blue
-    plt.title("Training and Validation Loss G" + title_suffix)
+    plt.title("Training Loss" + title_suffix)
     plt.xlabel("Epochs")
     plt.ylabel("Loss")
     plt.legend()
@@ -157,23 +153,14 @@ def plot_results_gan(
     plt.subplot(1, 4, 2)
     plt.plot(
         epochs,
-        train_loss_d,
-        label="Train Loss D",
+        validation_loss,
+        label="Validation Loss",
         marker="o",
         linestyle="--",
         color="#f70d1a",
         linewidth=2,
     )  # vivid red
-    plt.plot(
-        epochs,
-        validation_loss_d,
-        label="Validation Loss D",
-        marker="o",
-        linestyle="--",
-        color="#002147",
-        linewidth=2,
-    )  # oxford blue
-    plt.title("Training and Validation Loss D" + title_suffix)
+    plt.title("Validation Loss" + title_suffix)
     plt.xlabel("Epochs")
     plt.ylabel("Loss")
     plt.legend()
@@ -184,15 +171,6 @@ def plot_results_gan(
     plt.subplot(1, 4, 3)
     plt.plot(
         epochs,
-        train_accuracy,
-        label="Train Accuracy",
-        marker="o",
-        linestyle="-",
-        color="#f70d1a",
-        linewidth=2,
-    )  # vivid red
-    plt.plot(
-        epochs,
         validation_accuracy,
         label="Validation Accuracy",
         marker="o",
@@ -200,7 +178,7 @@ def plot_results_gan(
         color="#002147",
         linewidth=2,
     )  # oxford blue
-    plt.title("Training and Validation Accuracy" + title_suffix)
+    plt.title("Validation Accuracy" + title_suffix)
     plt.xlabel("Epochs")
     plt.ylabel("Accuracy")
     plt.legend()
@@ -211,15 +189,6 @@ def plot_results_gan(
     plt.subplot(1, 4, 4)
     plt.plot(
         epochs,
-        train_f1,
-        label="Train F1 Score",
-        marker="o",
-        linestyle="-",
-        color="#f70d1a",
-        linewidth=2,
-    )  # vivid red
-    plt.plot(
-        epochs,
         validation_f1,
         label="Validation F1 Score",
         marker="o",
@@ -227,7 +196,7 @@ def plot_results_gan(
         color="#002147",
         linewidth=2,
     )  # oxford blue
-    plt.title("Training and Validation F1 score" + title_suffix)
+    plt.title("Validation F1 score" + title_suffix)
     plt.xlabel("Epochs")
     plt.ylabel("F1 score")
     plt.legend()
