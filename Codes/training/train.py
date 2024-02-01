@@ -422,7 +422,9 @@ def train_gan(
             generator_optimizer.step()
             discriminator_optimizer.step()
 
-            train_loss += generator_loss + discriminator_loss
+            train_loss += torch.tensor(
+                generator_loss.item() + discriminator_loss.item()
+            )
             data_count += one_hot_labels.size(0)
             corrects += correct_predictions_d
             predictions_f1.extend(one_hot_predictions.detach().cpu().max(1)[1])
@@ -450,10 +452,13 @@ def train_gan(
                 encoded_bow_attention_val = batch[5].to(device)
 
             with torch.no_grad():
-                supervised_indices_val = torch.nonzero(is_supervised_val == 1).squeeze()
-                unsupervised_indices_val = torch.nonzero(
-                    is_supervised_val == 0
-                ).squeeze()
+                supervised_indices_val = [
+                    item for item in is_supervised_val if item == 1
+                ]
+                # supervised_indices   = torch.nonzero(is_supervised == 1).squeeze()
+                unsupervised_indices_val = [
+                    item for item in is_supervised_val if item == 0
+                ]
                 real_batch_size_val = encoded_input_val.shape[0]
 
                 # Encode real data in the Transformer
@@ -463,8 +468,7 @@ def train_gan(
                 hidden_states_val = model_outputs_val[-1]
 
                 # Define noise_size as the same size as the encoded_input
-                noise_size_val = encoded_input_val.shape[1]
-
+                noise_size_val = 100
                 noise_val = torch.zeros(
                     real_batch_size_val, noise_size_val, device=device
                 ).uniform_(0, 1)
@@ -494,8 +498,8 @@ def train_gan(
                 fake_predictions_val = probabilities_val[:real_batch_size_val]
                 real_predictions_val = probabilities_val[real_batch_size_val:]
 
-                fake_logits_val = logits[:real_batch_size]
-                real_logits_val = logits[real_batch_size:]
+                fake_logits_val = logits_val[:real_batch_size_val]
+                real_logits_val = logits_val[real_batch_size_val:]
 
                 # ------------------------------------------------
                 # if supervised_indices.shape[0] != 0 :
@@ -556,7 +560,9 @@ def train_gan(
                     Discriminator_fake_probability_val,
                 )
 
-                validation_loss += generator_loss_val + discriminator_loss_val
+                validation_loss += torch.tensor(
+                    generator_loss_val.item() + discriminator_loss_val.item()
+                )
                 validation_data_count += one_hot_labels_val.size(0)
                 validation_corrects += correct_predictions_d_val
                 validation_predictions_f1.extend(

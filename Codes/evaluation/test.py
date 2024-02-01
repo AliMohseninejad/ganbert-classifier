@@ -27,7 +27,7 @@ def test_vanilla_bert(
     transformer.load_state_dict(torch.load(transformer_path))
     transformer.to(device)
     transformer.eval()
-    discriminator = Discriminator(num_labels = 6)
+    discriminator = Discriminator(num_labels=6)
     discriminator.load_state_dict(torch.load(discriminator_path))
     discriminator.to(device)
     discriminator.eval()
@@ -37,32 +37,26 @@ def test_vanilla_bert(
 
     test_predictions_f1 = []
     test_true_labels_f1 = []
+    for batch in test_dataloader:
+        # Unpack this training batch from our dataloader.
+        encoded_input = batch[0].to(device)
+        encoded_attention_mask = batch[1].to(device)
+        labels = batch[2].to(device)
+        is_supervised = batch[3].to(device)
 
-    with torch.no_grad():
-        for batch in test_dataloader:
-            # Unpack this training batch from our dataloader.
-            encoded_input           = batch[0].to(device)
-            encoded_attention_mask  = batch[1].to(device)
-            labels                  = batch[2].to(device)
-            is_supervised           = batch[3].to(device)
-
-            supervised_indices = torch.nonzero(is_supervised == 1).squeeze()
-
+        with torch.no_grad():
             model_outputs = transformer(
                 encoded_input, attention_mask=encoded_attention_mask
             )
             features, logits, probabilities = discriminator(model_outputs[-1])
 
-            if supervised_indices.shape[0] != 0:
-                real_prediction_supervised = probabilities[supervised_indices]
-                _, predictions = real_prediction_supervised.max(1)
-                _, labels_max = labels[supervised_indices].max(1)
-                correct_predictions_d = predictions.eq(labels_max).sum().item()
-            else:
-                correct_predictions_d = torch.zeros((1,))
+            real_prediction_supervised = probabilities
+            _, predictions = real_prediction_supervised.max(1)
+            _, labels_max = labels.max(1)
+            correct_predictions_d = predictions.eq(labels_max).sum().item()
 
             one_hot_predictions = F.one_hot(predictions, num_classes=6).float()
-            one_hot_labels = labels[supervised_indices]
+            one_hot_labels = labels
 
             test_data_count += one_hot_labels.size(0)
             test_corrects += correct_predictions_d
@@ -117,19 +111,20 @@ def test_gan_bert(
     discriminator.eval()
     transformer.eval()
 
-    with torch.no_grad():
-        for batch in test_dataloader:
-            # Unpack this training batch from our dataloader.
-            encoded_input = batch[0].to(device)
-            encoded_attention_mask = batch[1].to(device)
-            labels = batch[2].to(device)
-            is_supervised = batch[3].to(device)
-            if bow_mode:
-                encoded_bow = batch[4].to(device)
-                encoded_bow_attention = batch[5].to(device)
+    for batch in test_dataloader:
+        # Unpack this training batch from our dataloader.
+        encoded_input = batch[0].to(device)
+        encoded_attention_mask = batch[1].to(device)
+        labels = batch[2].to(device)
+        is_supervised = batch[3].numpy().tolist()
+        if bow_mode:
+            encoded_bow = batch[4].to(device)
+            encoded_bow_attention = batch[5].to(device)
 
-            supervised_indices = torch.nonzero(is_supervised == 1).squeeze()
-            unsupervised_indices = torch.nonzero(is_supervised == 0).squeeze()
+        with torch.no_grad():
+            supervised_indices = [item for item in is_supervised if item == 1]
+            # supervised_indices   = torch.nonzero(is_supervised == 1).squeeze()
+            unsupervised_indices = [item for item in is_supervised if item == 0]
             real_batch_size = encoded_input.shape[0]
 
             # Encode real data in the Transformer
@@ -139,15 +134,14 @@ def test_gan_bert(
             hidden_states = model_outputs[-1]
 
             # Define noise_size as the same size as the encoded_input
-            noise_size = encoded_input.shape[1]
-
+            noise_size = 100
             noise = torch.zeros((real_batch_size, noise_size)).uniform_(0, 1)
 
             # Train Generator1
             if bow_mode:
                 generator_outputs = transformer(
                     encoded_bow, attention_mask=encoded_bow_attention
-                )
+                )[-1]
             else:
                 generator_outputs = generator(noise)
 
@@ -163,7 +157,7 @@ def test_gan_bert(
             real_predictions = probabilities[real_batch_size:]
 
             # ------------------------------------------------
-            if supervised_indices.shape[0] != 0:
+            if len(supervised_indices) != 0:
                 real_prediction_supervised = real_predictions[supervised_indices]
                 sup_fake_probabilities = torch.cat(
                     [fake_predictions, real_prediction_supervised], dim=0
@@ -181,20 +175,20 @@ def test_gan_bert(
 
             _, labels_index = all_labels.max(1)
             correct_predictions_d = predictions.eq(labels_index).sum().item()
-            one_hot_predictions = F.one_hot(predictions)
-            one_hot_labels = F.one_hot(labels_index)
+            one_hot_predictions = F.one_hot(predictions, num_classes=7)
+            one_hot_labels = F.one_hot(labels_index, num_classes=7).float()
             # -------------------------------------------------------------------------
 
             test_data_count += one_hot_labels.size(0)
             test_corrects += correct_predictions_d
-            test_predictions_f1.extend(one_hot_predictions.cpu())
-            test_true_labels_f1.extend(one_hot_labels.cpu())
+            test_predictions_f1.extend(one_hot_predictions.detach().cpu().max(1)[1])
+            test_true_labels_f1.extend(one_hot_labels.detach().cpu().max(1)[1])
 
     # Calculate average loss and accuracy
     test_accuracy = test_corrects / test_data_count
     test_true_labels_f1_np = np.array(test_true_labels_f1)
     test_predictions_f1_np = np.array(test_predictions_f1)
-    test_f1 = f1_score(test_true_labels_f1_np, test_predictions_f1_np, average="binary")
+    test_f1 = f1_score(test_true_labels_f1_np, test_predictions_f1_np, average="micro")
 
     print(f"Test Accuracy equals: {test_accuracy}")
     print(f"Test f1 score equals: {test_f1}")
