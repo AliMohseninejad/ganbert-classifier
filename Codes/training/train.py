@@ -289,13 +289,10 @@ def train_gan(
     for epoch in range(epochs):
         train_loss_g = 0.0
         train_loss_d = 0.0
-        validation_loss_g = 0.0
         validation_loss = 0.0
         # ------------------------
-        train_accuracy = 0.0
         validation_accuracy = 0.0
         # ------------------------
-        train_f1 = 0.0
         validation_f1 = 0.0
         # ------------------------
         corrects = 0.0
@@ -303,9 +300,7 @@ def train_gan(
         data_count = 0.0
         validation_data_count = 0.0
 
-        predictions_f1 = []
         validation_predictions_f1 = []
-        true_labels_f1 = []
         validation_true_labels_f1 = []
 
         # Training loop
@@ -366,28 +361,6 @@ def train_gan(
             fake_logits = logits[:real_batch_size]
             real_logits = logits[real_batch_size:]
 
-            # ------------------------------------------------
-            # if supervised_indices.shape[0] != 0 :
-            if len(supervised_indices) != 0:
-                real_prediction_supervised = real_predictions[supervised_indices]
-                sup_fake_probabilities = torch.cat(
-                    [fake_predictions, real_prediction_supervised], dim=0
-                )
-                _, predictions = sup_fake_probabilities.max(1)
-                fake_labels = torch.zeros_like(fake_predictions)
-                fake_labels[:, -1] = 1
-                fake_labels.to(fake_predictions.device)
-                all_labels = torch.cat([fake_labels, labels[supervised_indices]], dim=0)
-            else:
-                _, predictions = fake_predictions.max(1)
-                all_labels = torch.zeros_like(fake_predictions)
-                all_labels[:, -1] = 1
-                all_labels.to(fake_predictions.device)
-
-            _, labels_index = all_labels.max(1)
-            correct_predictions_d = predictions.eq(labels_index).sum().item()
-            one_hot_predictions = F.one_hot(predictions, num_classes=7).float()
-            one_hot_labels = F.one_hot(labels_index, num_classes=7).float()
             # -------------------------------------------------------------------------
             # Finally, we separate the discriminator's output for the real and fake data
 
@@ -425,17 +398,9 @@ def train_gan(
 
             train_loss_g += torch.tensor(generator_loss.item())
             train_loss_d += torch.tensor(discriminator_loss.item())
-            data_count += one_hot_labels.size(0)
-            corrects += correct_predictions_d
-            predictions_f1.extend(one_hot_predictions.detach().cpu().max(1)[1])
-            true_labels_f1.extend(one_hot_labels.detach().cpu().max(1)[1])
 
         train_loss_g /= len(train_dataloader)
         train_loss_d /= len(train_dataloader)
-        train_accuracy = corrects / data_count
-        true_labels_f1_np = np.array(true_labels_f1)
-        predictions_f1_np = np.array(predictions_f1)
-        train_f1 = f1_score(true_labels_f1_np, predictions_f1_np, average="micro")
 
         # Validation loop
         # generator.eval()
