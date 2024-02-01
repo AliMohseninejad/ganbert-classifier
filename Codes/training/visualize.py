@@ -1,6 +1,7 @@
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt 
+import os
 
-def plot_results(results, title_suffix):
+def plot_results(results, title_suffix, save_path=None):
     epochs              = [result["epoch"]                                   for result in results]
     train_loss          = [result["train_loss"].detach().cpu().numpy()       for result in results]
     validation_loss     = [result["validation_loss"].detach().cpu().numpy()  for result in results]
@@ -18,7 +19,7 @@ def plot_results(results, title_suffix):
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
-    plt.grid(True, linestyle='--', linewidth=0.4, color='#b0b0b0')  # Add thin dashed grid lines
+    plt.grid(True, linestyle='--', linewidth=0.4, color='#b0b0b0')  
     plt.tight_layout()
     #----------------------------------------------------------------------------------------------
     # Plot Accuracy
@@ -29,7 +30,7 @@ def plot_results(results, title_suffix):
     plt.xlabel('Epochs')
     plt.ylabel('Accuracy')
     plt.legend()
-    plt.grid(True, linestyle='--', linewidth=0.4, color='#b0b0b0')  # Add thin dashed grid lines
+    plt.grid(True, linestyle='--', linewidth=0.4, color='#b0b0b0')  
     plt.tight_layout()
     #----------------------------------------------------------------------------------------------
     # plot F1
@@ -40,9 +41,13 @@ def plot_results(results, title_suffix):
     plt.xlabel('Epochs')
     plt.ylabel('F1 score')
     plt.legend()
-    plt.grid(True, linestyle='--', linewidth=0.4, color='#b0b0b0')  # Add thin dashed grid lines
+    plt.grid(True, linestyle='--', linewidth=0.4, color='#b0b0b0')  
     plt.tight_layout()
 
+    # Save the plot if save_path is provided
+    if save_path:
+        plot_filename = f"plot_{title_suffix.replace(' ', '_')}.png"
+        plot_filepath = os.path.join(save_path, plot_filename)
+        plt.savefig(plot_filepath)
 
     plt.show()
-
