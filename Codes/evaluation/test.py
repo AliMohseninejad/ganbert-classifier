@@ -19,7 +19,7 @@ def test_vanilla_bert(
     transformer_path: str,
     discriminator_path: str,
     test_dataloader: DataLoader,
-):
+) -> (float, float):
     random.seed(42)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -71,6 +71,7 @@ def test_vanilla_bert(
         )
     print(f"Test Accuracy equals: {test_accuracy}")
     print(f"Test f1 score equals: {test_f1}")
+    return test_accuracy, test_f1
 
 
 def test_gan_bert(
@@ -80,7 +81,7 @@ def test_gan_bert(
     discriminator_path: str,
     bow_mode: bool,
     test_dataloader: DataLoader,
-):
+) -> (float, float):
     random.seed(42)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -192,3 +193,5 @@ def test_gan_bert(
 
     print(f"Test Accuracy equals: {test_accuracy}")
     print(f"Test f1 score equals: {test_f1}")
+
+    return test_accuracy, test_f1
