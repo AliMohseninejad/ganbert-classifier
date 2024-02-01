@@ -43,10 +43,10 @@ def generate_dataloader(
     # Read train, validation, and test data from JSON lines files
     train_df = pd.read_json(dataset_folder_path + "subtaskB_train.jsonl", lines=True)
     test_df = pd.read_json(dataset_folder_path + "subtaskB_dev.jsonl", lines=True)
+    train_df, valid_df = train_test_split(train_df, test_size=0.1, stratify=train_df['label'], random_state=42)
     if not use_unsup:
         train_df, _  = train_test_split(train_df, train_size=1-unsupervised_ratio, stratify=train_df['label'], random_state=42)
         unsupervised_ratio = 0
-    train_df, valid_df = train_test_split(train_df, test_size=0.1, stratify=train_df['label'], random_state=42)
 
     # Preprocess data
     def preprocess_data(df):
