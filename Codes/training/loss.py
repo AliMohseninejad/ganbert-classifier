@@ -61,14 +61,17 @@ class DiscriminatorLossFunction(nn.Module):
         Discriminator_fake_probability,
     ):
         # -------------------------------------------------------------------------------------
-        Loss_Function = nn.CrossEntropyLoss(ignore_index=-1)
-        # -------------------------------------------------------------------------------------
+
+        logits = real_logits[:, 0:-1]
+        log_probs = F.log_softmax(logits, dim=-1)
+        per_example_loss = -torch.sum(labels[:, 0:-1] * log_probs, dim=-1)
+
         if len(supervised_indices) == 0:
             Loss_D_supervised = torch.zeros((1,)).to(labels.device)
         else:
-            Loss_D_supervised = Loss_Function(
-                real_logits[supervised_indices],
-                labels[supervised_indices],
+            Loss_D_supervised = torch.div(
+                torch.sum(per_example_loss.to(labels.device)),
+                labels[supervised_indices].shape[0],
             )
 
         # -------------------------------------------------------------------------------------
