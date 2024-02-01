@@ -288,8 +288,10 @@ def train_gan(
     transformer.to(device)
 
     for epoch in range(epochs):
-        train_loss = 0.0
-        validation_loss = 0.0
+        train_loss_g = 0.0
+        train_loss_d = 0.0
+        validation_loss_g = 0.0
+        validation_loss_d = 0.0
         # ------------------------
         train_accuracy = 0.0
         validation_accuracy = 0.0
@@ -422,15 +424,15 @@ def train_gan(
             generator_optimizer.step()
             discriminator_optimizer.step()
 
-            train_loss += torch.tensor(
-                generator_loss.item() + discriminator_loss.item()
-            )
+            train_loss_g += torch.tensor(generator_loss.item())
+            train_loss_d += torch.tensor(discriminator_loss.item())
             data_count += one_hot_labels.size(0)
             corrects += correct_predictions_d
             predictions_f1.extend(one_hot_predictions.detach().cpu().max(1)[1])
             true_labels_f1.extend(one_hot_labels.detach().cpu().max(1)[1])
 
-        train_loss /= len(train_dataloader)
+        train_loss_g /= len(train_dataloader)
+        train_loss_d /= len(train_dataloader)
         train_accuracy = corrects / data_count
         true_labels_f1_np = np.array(true_labels_f1)
         predictions_f1_np = np.array(predictions_f1)
@@ -560,9 +562,8 @@ def train_gan(
                     Discriminator_fake_probability_val,
                 )
 
-                validation_loss += torch.tensor(
-                    generator_loss_val.item() + discriminator_loss_val.item()
-                )
+                validation_loss_g += torch.tensor(generator_loss_val.item())
+                validation_loss_d += torch.tensor(discriminator_loss_val.item())
                 validation_data_count += one_hot_labels_val.size(0)
                 validation_corrects += correct_predictions_d_val
                 validation_predictions_f1.extend(
@@ -573,7 +574,8 @@ def train_gan(
                 )
 
         # Calculate average loss and accuracy
-        validation_loss /= len(validation_dataloader)
+        validation_loss_g /= len(validation_dataloader)
+        validation_loss_d /= len(validation_dataloader)
         validation_accuracy = validation_corrects / validation_data_count
         validation_true_labels_f1_np = np.array(validation_true_labels_f1)
         validation_predictions_f1_np = np.array(validation_predictions_f1)
@@ -582,8 +584,8 @@ def train_gan(
         )
 
         # Update best model
-        if validation_loss < best_loss:
-            best_loss = validation_loss
+        if (validation_loss_g + validation_loss_d) < best_loss:
+            best_loss = validation_loss_g + validation_loss_d
             best_epoch = epoch
             torch.save(generator.state_dict(), generator_path)
             torch.save(discriminator.state_dict(), discriminator_path)
@@ -594,11 +596,13 @@ def train_gan(
         result = {
             "epoch": epoch,
             # -------------------------------------------
-            "train_loss": train_loss,
+            "train_loss_g": train_loss_g,
+            "train_loss_d": train_loss_d,
             "train_accuracy": train_accuracy,
             "train_f1": train_f1,
             # -------------------------------------------
-            "validation_loss": validation_loss,
+            "validation_loss_g": validation_loss_g,
+            "validation_loss_d": validation_loss_d,
             "validation_accuracy": validation_accuracy,
             "validation_f1": validation_f1,
         }
@@ -614,8 +618,8 @@ def train_gan(
         # Print progress
         print(
             f"Epoch {epoch+1}/{epochs}: "
-            f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f},Train_f1: {train_f1: .4f}"
-            f"Validation Loss: {validation_loss:.4f}, Validation Accuracy: {validation_accuracy:.4f}, Validation_f1: {validation_f1:.4f}"
+            f"Train Loss G: {train_loss_g:.4f}, Train Loss D: {train_loss_d:.4f}, Train Accuracy: {train_accuracy:.4f} ,Train_f1: {train_f1: .4f} "
+            f"Validation Loss G: {validation_loss_g:.4f}, Validation Loss D: {validation_loss_d:.4f}, Validation Accuracy: {validation_accuracy:.4f}, Validation_f1: {validation_f1:.4f}"
         )
 
     print(f"Best model saved at epoch {best_epoch}")
