@@ -64,7 +64,7 @@ class DiscriminatorLossFunction(nn.Module):
 
         logits = real_logits[:, 0:-1]
         log_probs = F.log_softmax(logits, dim=-1)
-        per_example_loss = -torch.sum(labels[:, 0:-1] * log_probs, dim=-1)
+        per_example_loss = -torch.sum(labels * log_probs, dim=-1)
 
         if len(supervised_indices) == 0:
             Loss_D_supervised = torch.zeros((1,)).to(labels.device)

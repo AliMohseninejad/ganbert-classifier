@@ -123,14 +123,15 @@ def test_gan_bert(
             discriminator_input = hidden_states
 
             features, logits, probabilities = discriminator(discriminator_input)
+            filtered_logits = logits[:, 0:-1]
 
             # Calculate the number of correct predictions for real and fake examples
-            real_prediction_supervised = probabilities
+            real_prediction_supervised = filtered_logits
             _, predictions = real_prediction_supervised.max(1)
             _, labels_max = labels.max(1)
             correct_predictions_d = predictions.eq(labels_max).sum().item()
 
-            one_hot_predictions = F.one_hot(predictions, num_classes=7).float()
+            one_hot_predictions = F.one_hot(predictions, num_classes=6).float()
             one_hot_labels = labels
 
             test_data_count += one_hot_labels.size(0)

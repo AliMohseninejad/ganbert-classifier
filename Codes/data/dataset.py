@@ -69,8 +69,6 @@ class GanBertDataset(Dataset):
         # Convert label to one-hot tensor
         # num_classes = len(set(self.labels))
         num_classes = 6
-        if self.use_unsup:
-            num_classes = num_classes + 1
         label_tensor = torch.nn.functional.one_hot(
             label, num_classes=num_classes
         ).float()
@@ -148,7 +146,7 @@ class GanBertBagOfWordsDataset(Dataset):
 
         # Convert label to one-hot tensor
         # num_classes = len(set(self.labels))+1
-        num_classes = 7
+        num_classes = 6
         label_tensor = torch.nn.functional.one_hot(
             label, num_classes=num_classes
         ).float()

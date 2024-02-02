@@ -426,8 +426,9 @@ def train_gan(
                 features_val, logits_val, probabilities_val = discriminator(
                     discriminator_input_val
                 )
+                filtered_logits_val = logits_val[:, 0:-1]
 
-                real_prediction_supervised_val = probabilities_val
+                real_prediction_supervised_val = filtered_logits_val
                 _, predictions_val = real_prediction_supervised_val.max(1)
                 _, labels_max_val = labels_val.max(1)
                 correct_predictions_d_val = (
@@ -435,11 +436,13 @@ def train_gan(
                 )
 
                 one_hot_predictions_val = F.one_hot(
-                    predictions_val, num_classes=7
+                    predictions_val, num_classes=6
                 ).float()
                 one_hot_labels_val = labels_val
 
-                loss_val = loss_function_validation(logits_val, one_hot_labels_val)
+                loss_val = loss_function_validation(
+                    filtered_logits_val, one_hot_labels_val
+                )
 
                 validation_loss += torch.tensor(loss_val.item())
                 validation_data_count += one_hot_labels_val.size(0)
