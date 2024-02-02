@@ -4,6 +4,7 @@ from typing import *
 from torch.utils.data import Dataset
 from transformers import BertTokenizer
 import random
+import math
 
 
 class GanBertDataset(Dataset):
@@ -22,14 +23,39 @@ class GanBertDataset(Dataset):
     ):
         random.seed(42)
         self.tokenizer = tokenizer
-        self.texts = texts
-        self.labels = labels
+        self.texts_ = texts
+        self.labels_ = labels
         self.max_length = max_length
         self.use_unsup = use_unsup
-        self.is_sup = [
+        self.is_sup_ = [
             0 if random.random() < unsupervised_ratio else 1
             for _ in range(len(self.labels))
         ]
+
+        self.is_sup = []
+        self.texts = []
+        self.labels = []
+
+        # Replicate supervised data for gan-bert model
+        for index, item in enumerate(self.texts_):
+            if use_unsup:
+                if self.is_sup_[index] == 1:
+                    balance = int(1 / (1 - unsupervised_ratio))
+                    balance = int(math.log(balance, 2))
+                    if balance < 1:
+                        balance = 1
+                    for _ in range(0, int(balance)):
+                        self.is_sup.append(1)
+                        self.texts.append(item)
+                        self.labels.append(self.labels_[index])
+                else:
+                    self.is_sup.append(self.is_sup_[index])
+                    self.texts.append(item)
+                    self.labels.append(self.labels_[index])
+            else:
+                self.is_sup.append(self.is_sup_[index])
+                self.texts.append(item)
+                self.labels.append(self.labels_[index])
 
     def __len__(self) -> int:
         return len(self.texts)
@@ -92,15 +118,35 @@ class GanBertBagOfWordsDataset(Dataset):
     ):
         random.seed(42)
         self.tokenizer = tokenizer
-        self.texts = texts
-        self.labels = labels
+        self.texts_ = texts
+        self.labels_ = labels
         self.sample_length = 100
         self.words = " ".join(self.texts).split()
         self.max_length = max_length
-        self.is_sup = [
+        self.is_sup_ = [
             0 if random.random() < unsupervised_ratio else 1
             for _ in range(len(self.labels))
         ]
+
+        self.is_sup = []
+        self.texts = []
+        self.labels = []
+
+        # Replicate supervised data for gan-bert model
+        for index, item in enumerate(self.texts_):
+            if self.is_sup_[index] == 1:
+                balance = int(1 / (1 - unsupervised_ratio))
+                balance = int(math.log(balance, 2))
+                if balance < 1:
+                    balance = 1
+                for _ in range(0, int(balance)):
+                    self.is_sup.append(1)
+                    self.texts.append(item)
+                    self.labels.append(self.labels_[index])
+            else:
+                self.is_sup.append(self.is_sup_[index])
+                self.texts.append(item)
+                self.labels.append(self.labels_[index])
 
     def __len__(self) -> int:
         return len(self.texts)
