@@ -60,7 +60,7 @@ def train_vanilla_classier(
     loss_function_validation = nn.CrossEntropyLoss(ignore_index=-1)
 
     results = []
-    best_loss = float("inf")
+    best_accuracy = 0
     best_epoch = 0
 
     for epoch in range(epochs):
@@ -184,8 +184,8 @@ def train_vanilla_classier(
         )
 
         # Update best model
-        if validation_loss < best_loss:
-            best_loss = validation_loss
+        if validation_accuracy < best_accuracy:
+            best_accuracy = validation_accuracy
             best_epoch = epoch
             torch.save(classifier.state_dict(), classifier_path)
             torch.save(transformer.state_dict(), transformer_path)
@@ -270,7 +270,7 @@ def train_gan(
     """
     random.seed(42)
     results = []
-    best_loss = float("inf")
+    best_accuracy = 0
     best_epoch = 0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # device = 'cpu'
@@ -461,8 +461,8 @@ def train_gan(
         )
 
         # Update best model
-        if validation_loss < best_loss:
-            best_loss = validation_loss
+        if validation_accuracy > best_accuracy:
+            best_accuracy = validation_accuracy
             best_epoch = epoch
             torch.save(generator.state_dict(), generator_path)
             torch.save(discriminator.state_dict(), discriminator_path)
