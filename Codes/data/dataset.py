@@ -29,7 +29,7 @@ class GanBertDataset(Dataset):
         self.use_unsup = use_unsup
         self.is_sup_ = [
             0 if random.random() < unsupervised_ratio else 1
-            for _ in range(len(self.labels))
+            for _ in range(len(self.labels_))
         ]
 
         self.is_sup = []
@@ -125,7 +125,7 @@ class GanBertBagOfWordsDataset(Dataset):
         self.max_length = max_length
         self.is_sup_ = [
             0 if random.random() < unsupervised_ratio else 1
-            for _ in range(len(self.labels))
+            for _ in range(len(self.labels_))
         ]
 
         self.is_sup = []
