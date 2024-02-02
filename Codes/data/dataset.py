@@ -20,6 +20,7 @@ class GanBertDataset(Dataset):
         unsupervised_ratio: float,
         max_length,
         use_unsup,
+        training_mode=False,
     ):
         random.seed(42)
         self.tokenizer = tokenizer
@@ -38,7 +39,7 @@ class GanBertDataset(Dataset):
 
         # Replicate supervised data for gan-bert model
         for index, item in enumerate(self.texts_):
-            if use_unsup:
+            if use_unsup and training_mode:
                 if self.is_sup_[index] == 1:
                     balance = int(1 / (1 - unsupervised_ratio))
                     balance = int(math.log(balance, 2))
@@ -115,6 +116,7 @@ class GanBertBagOfWordsDataset(Dataset):
         labels: List[int],
         unsupervised_ratio: float,
         max_length,
+        training_mode=False,
     ):
         random.seed(42)
         self.tokenizer = tokenizer
@@ -134,13 +136,18 @@ class GanBertBagOfWordsDataset(Dataset):
 
         # Replicate supervised data for gan-bert model
         for index, item in enumerate(self.texts_):
-            if self.is_sup_[index] == 1:
-                balance = int(1 / (1 - unsupervised_ratio))
-                balance = int(math.log(balance, 2))
-                if balance < 1:
-                    balance = 1
-                for _ in range(0, int(balance)):
-                    self.is_sup.append(1)
+            if training_mode:
+                if self.is_sup_[index] == 1:
+                    balance = int(1 / (1 - unsupervised_ratio))
+                    balance = int(math.log(balance, 2))
+                    if balance < 1:
+                        balance = 1
+                    for _ in range(0, int(balance)):
+                        self.is_sup.append(1)
+                        self.texts.append(item)
+                        self.labels.append(self.labels_[index])
+                else:
+                    self.is_sup.append(self.is_sup_[index])
                     self.texts.append(item)
                     self.labels.append(self.labels_[index])
             else:
