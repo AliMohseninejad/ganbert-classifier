@@ -184,7 +184,7 @@ def train_vanilla_classier(
         )
 
         # Update best model
-        if validation_accuracy < best_accuracy:
+        if validation_accuracy > best_accuracy:
             best_accuracy = validation_accuracy
             best_epoch = epoch
             torch.save(classifier.state_dict(), classifier_path)
