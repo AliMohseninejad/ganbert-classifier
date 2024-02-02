@@ -123,7 +123,7 @@ class GanBertBagOfWordsDataset(Dataset):
         self.texts_ = texts
         self.labels_ = labels
         self.sample_length = 100
-        self.words = " ".join(self.texts).split()
+        self.words = " ".join(self.texts_).split()
         self.max_length = max_length
         self.is_sup_ = [
             0 if random.random() < unsupervised_ratio else 1
