@@ -4,7 +4,7 @@ import torch.nn as nn
 
 class Discriminator(nn.Module):
     """Implement the discriminator model discussed in the paper"""
-    def __init__(self, input_size=768, hidden_sizes=[768], num_labels=7, dropout_rate=0.1):
+    def __init__(self, input_size=768, hidden_sizes=[768], num_labels=7, dropout_rate=0.5):
         super(Discriminator, self).__init__()
         self.input_dropout = nn.Dropout(p=dropout_rate)
         layers = []
