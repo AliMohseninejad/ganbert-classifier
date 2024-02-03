@@ -67,7 +67,7 @@ def test_vanilla_bert(
         test_true_labels_f1_np = np.array(test_true_labels_f1)
         test_predictions_f1_np = np.array(test_predictions_f1)
         test_f1 = f1_score(
-            test_true_labels_f1_np, test_predictions_f1_np, average="micro"
+            test_true_labels_f1_np, test_predictions_f1_np, average="weighted"
         )
     print(f"Test Accuracy equals: {test_accuracy}")
     print(f"Test f1 score equals: {test_f1}")
@@ -143,7 +143,7 @@ def test_gan_bert(
     test_accuracy = test_corrects / test_data_count
     test_true_labels_f1_np = np.array(test_true_labels_f1)
     test_predictions_f1_np = np.array(test_predictions_f1)
-    test_f1 = f1_score(test_true_labels_f1_np, test_predictions_f1_np, average="micro")
+    test_f1 = f1_score(test_true_labels_f1_np, test_predictions_f1_np, average="weighted")
 
     print(f"Test Accuracy equals: {test_accuracy}")
     print(f"Test f1 score equals: {test_f1}")
