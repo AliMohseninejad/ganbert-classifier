@@ -27,6 +27,7 @@ def train_vanilla_classier(
     validation_dataloader: DataLoader,
     transformer_path: str,
     classifier_path: str,
+    multi_gpu: bool = False
 ) -> Tuple[BertModel, Discriminator, List[Dict[str, float]]]:
     """Main function to train the simple BERT + Discriminator model. In this
     code, the model is trained and validated. In the end the best model is saved
@@ -55,6 +56,8 @@ def train_vanilla_classier(
     # device = 'cpu'
     transformer.to(device)
     classifier.to(device)
+    if device=="cuda" and multi_gpu:
+        transformer = torch.nn.DataParallel(transformer)
 
     loss_function_train = nn.CrossEntropyLoss(ignore_index=-1)
     loss_function_validation = nn.CrossEntropyLoss(ignore_index=-1)
@@ -238,6 +241,7 @@ def train_gan(
     generator_path: str,
     transformer_path: str,
     discriminator_path: str,
+    multi_gpu: bool = False,
 ) -> Tuple[BertModel, Generator1, Discriminator, List[Dict[str, float]]]:
     """Main function to train the BERT-GAN model. In this code, the model is
     trained and validated. In the end the best model is saved on disk.
@@ -285,6 +289,10 @@ def train_gan(
     generator.to(device)
     discriminator.to(device)
     transformer.to(device)
+    if device=="cuda" and multi_gpu:
+        transformer = torch.nn.DataParallel(transformer)
+        if bow_mode:
+            generator = torch.nn.DataParallel(generator)
 
     for epoch in range(epochs):
         train_loss_g = 0.0
