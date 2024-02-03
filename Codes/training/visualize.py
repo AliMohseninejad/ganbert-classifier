@@ -113,7 +113,7 @@ def plot_results_gan(
     epochs = [result["epoch"] for result in results]
     train_loss_g = [result["train_loss_g"].detach().cpu().numpy() for result in results]
     validation_loss = [
-        result["validation_loss_g"].detach().cpu().numpy() for result in results
+        result["validation_loss"].detach().cpu().numpy() for result in results
     ]
     train_loss_d = [result["train_loss_d"].detach().cpu().numpy() for result in results]
 
