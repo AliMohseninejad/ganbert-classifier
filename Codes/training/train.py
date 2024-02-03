@@ -43,7 +43,9 @@ def train_vanilla_classier(
         scheduler is used if the value is `None`.
         train_dataloader (DataLoader): Training data dataloader
         validation_dataloader (DataLoader): Validation data dataloader
-        save_path (str): The path to the folder where models should be saved.
+        transformer_path (str): The path to the folder where transformer should be saved.
+        classifier_path (str): The path to the folder where classifier should be saved.
+        multi_gpu(bool): Flag indicating whether to use multiple GPUs for training.
 
     Returns:
         Tuple[BertModel, Discriminator, List[Dict[str, float]]]: A tuple containing
@@ -51,22 +53,31 @@ def train_vanilla_classier(
         Each element of the list is a dictionary containing train loss per
         epoch, validation loss per epoch, train accuracy, val accuracy, ...
     """
-    random.seed(42)
+    random.seed(42)   # Set random seed for reproducibility
+    
+    # Determine the device (cuda if available, otherwise cpu)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # device = 'cpu'
-    transformer.to(device)
+
+    transformer.to(device)   # Move models to the selected device
     classifier.to(device)
+    
+    # Use DataParallel if multi_gpu is True and the device is CUDA
     if device=="cuda" and multi_gpu:
         transformer = torch.nn.DataParallel(transformer)
-
-    loss_function_train = nn.CrossEntropyLoss(ignore_index=-1)
+        
+    # Define loss functions for training and validation
+    loss_function_train      = nn.CrossEntropyLoss(ignore_index=-1)
     loss_function_validation = nn.CrossEntropyLoss(ignore_index=-1)
-
-    results = []
+    #-1 implies that instances in validation set where the target value is equal to -1 will be ignored ! 
+    # we dont use unlabeled data in training of vanilla classifier
+    
+    results       = []
     best_accuracy = 0
-    best_epoch = 0
+    best_epoch    = 0
 
-    for epoch in range(epochs):
+    for epoch in range(epochs):  # Training loop for the specified number of epochs
+        
+        # Initialize metrics for training
         train_loss = 0.0
         validation_loss = 0.0
         # --------------------------
@@ -87,9 +98,10 @@ def train_vanilla_classier(
         true_labels_f1 = []
         validation_true_labels_f1 = []
 
-        classifier.train()
-        transformer.train()
+        classifier.train()  # Set classifier to train mode
+        transformer.train() # Set transformr to train mode
 
+        # Training loop over batches in the training dataloader
         for batch_i, batch in tqdm(
             enumerate(train_dataloader), total=len(train_dataloader)
         ):
@@ -99,28 +111,39 @@ def train_vanilla_classier(
             labels = batch[2].to(device)
             is_supervised = batch[3].to(device)
 
+            # Forward pass through the transformer
             model_outputs = transformer(
                 encoded_input, attention_mask=encoded_attention_mask
             )
             features, logits, probabilities = classifier(model_outputs[-1])
 
             # ------------------------------------------------
+            
+            #calculations 
             real_prediction_supervised = probabilities
             _, predictions = real_prediction_supervised.max(1)
             _, labels_max = labels.max(1)
             correct_predictions_d = predictions.eq(labels_max).sum().item()
             one_hot_predictions = F.one_hot(predictions, num_classes=6).float()
             one_hot_labels = labels
+            
+            '''
+            .max(1) returns a tuple containing two tensors – the first tensor
+            contains the maximum values along dimension 1, and the second tensor
+            contains the indices of these maximum values along dimension 1
+            '''
+            
+            loss = loss_function_train(logits, one_hot_labels) # Compute training loss
 
-            loss = loss_function_train(logits, one_hot_labels)
-
+            # Backward pass and optimization step
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
+            # Update metrics
             train_loss += loss
             data_count += one_hot_labels.size(0)
-            corrects += correct_predictions_d
+            corrects   += correct_predictions_d
             predictions_f1.extend(one_hot_predictions.detach().cpu().max(1)[1])
             true_labels_f1.extend(one_hot_labels.detach().cpu().max(1)[1])
 
@@ -128,30 +151,34 @@ def train_vanilla_classier(
             # print("corrects:" , corrects , "data_count:", data_count, "in batch :" , batch_i, "out of", str(len(train_dataloader)))
             # print("============================================")
 
+        # Calculate average training loss and accuracy
         train_loss /= len(train_dataloader)
         train_accuracy = corrects / data_count
         true_labels_f1_np = np.array(true_labels_f1)
         predictions_f1_np = np.array(predictions_f1)
         train_f1 = f1_score(true_labels_f1_np, predictions_f1_np, average="weighted")
 
+        # The function continues with validation and saving models
+        
         # Validation
         classifier.eval()
         transformer.eval()
-        for batch in validation_dataloader:
+        for batch in validation_dataloader: # Loop over batches in the validation dataloader
             # Unpack this training batch from our dataloader.
             encoded_input_val = batch[0].to(device)
             encoded_attention_mask_val = batch[1].to(device)
             labels_val = batch[2].to(device)
             is_supervised_val = batch[3].to(device)
 
-            with torch.no_grad():
+            with torch.no_grad():  # Disable gradient computation during validation
+                # Forward pass through the transformer
                 model_outputs_val = transformer(
                     encoded_input_val, attention_mask=encoded_attention_mask_val
                 )
                 features_val, logits_val, probabilities_val = classifier(
                     model_outputs_val[-1]
                 )
-
+                # Calculate various metrics
                 real_prediction_supervised_val = probabilities_val
                 _, predictions_val = real_prediction_supervised_val.max(1)
                 _, labels_max_val = labels_val.max(1)
@@ -164,8 +191,9 @@ def train_vanilla_classier(
                 ).float()
                 one_hot_labels_val = labels_val
 
+                # Compute validation loss
                 loss_val = loss_function_validation(logits_val, one_hot_labels_val)
-
+                # Update metrics for validation
                 validation_loss += loss_val
                 validation_data_count += one_hot_labels_val.size(0)
                 validation_corrects += correct_predictions_d_val
@@ -175,7 +203,7 @@ def train_vanilla_classier(
                 validation_true_labels_f1.extend(
                     one_hot_labels_val.detach().cpu().max(1)[1]
                 )
-
+        # Calculate average validation loss and accuracy and f1 score
         validation_loss /= len(validation_dataloader)
         validation_accuracy = validation_corrects / validation_data_count
         validation_true_labels_f1_np = np.array(validation_true_labels_f1)
@@ -186,14 +214,14 @@ def train_vanilla_classier(
             average="weighted",
         )
 
-        # Update best model
+        # # Update best model if validation accuracy improves
         if validation_accuracy > best_accuracy:
             best_accuracy = validation_accuracy
             best_epoch = epoch
             torch.save(classifier.state_dict(), classifier_path)
             torch.save(transformer.state_dict(), transformer_path)
 
-        # Update learning rate scheduler
+        # Update learning rate scheduler if applicable
         if scheduler is not None:
             scheduler.step()
 
@@ -206,7 +234,7 @@ def train_vanilla_classier(
         )
         print("-----------------------------------------------\n")
 
-        # Update results
+        # Update results for the current epoch
         result = {
             "epoch": epoch,
             "train_loss": train_loss,
@@ -217,9 +245,11 @@ def train_vanilla_classier(
             "validation_f1": validation_f1,
         }
         results.append(result)
-
+        
+    # End of training loop
     print(f"Best model saved at epoch {best_epoch}")
 
+    # Return trained models and results
     return transformer, classifier, results
 
 
@@ -264,6 +294,7 @@ def train_gan(
         generator_path (str): The path to the folder where generator should be saved
         transformer_path (str): The path to the folder where transformer should be saved
         discriminator_path (str): The path to the folder where discriminator should be saved
+        multi_gpu(bool): Flag indicating whether to use multiple GPUs for training.
 
     Returns:
         Tuple[BertModel, Generator, Discriminator, List[Dict[str, float]]]: A
@@ -277,26 +308,31 @@ def train_gan(
     best_accuracy = 0
     best_epoch = 0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # device = 'cpu'
 
     # ---------------------------------------------------------------------
-    generator_loss_function_train = GeneratorLossFunction()
+    # Define loss functions for the generator and discriminator
+    generator_loss_function_train     = GeneratorLossFunction()
     discriminator_loss_function_train = DiscriminatorLossFunction()
-
+    # Define the validation loss function
     loss_function_validation = nn.CrossEntropyLoss(ignore_index=-1)
     # ---------------------------------------------------------------------
 
+    # Move models to the selected device
     generator.to(device)
     discriminator.to(device)
     transformer.to(device)
+    
+    # Use DataParallel if multi_gpu is True and the device is CUDA
     if device=="cuda" and multi_gpu:
         transformer = torch.nn.DataParallel(transformer)
         if bow_mode:
             generator = torch.nn.DataParallel(generator)
 
-    for epoch in range(epochs):
-        train_loss_g = 0.0
-        train_loss_d = 0.0
+    for epoch in range(epochs):  # Training loop for the specified number of epochs
+        
+        # Initialize various metrics for training and validation
+        train_loss_g    = 0.0
+        train_loss_d    = 0.0
         validation_loss = 0.0
         # ------------------------
         validation_accuracy = 0.0
@@ -312,11 +348,12 @@ def train_gan(
         validation_true_labels_f1 = []
 
         # Training loop
+        # Set models to train mode
         generator.train()
         discriminator.train()
         transformer.train()
 
-        # train
+        # train # Training loop over batches in the training dataloader
         for batch_i, batch in tqdm(
             enumerate(train_dataloader), total=len(train_dataloader)
         ):
@@ -333,6 +370,13 @@ def train_gan(
             # supervised_indices   = torch.nonzero(is_supervised == 1).squeeze()
             unsupervised_indices = [item for item in is_supervised if item == 0]
             # unsupervised_indices = torch.nonzero(is_supervised == 0).squeeze()
+            
+            '''
+            This method iterates over each element in the is_supervised list. 
+            For each element, if it is equal to 1, it is added to the supervised_indices list;
+            if it is equal to 0, it is added to the unsupervised_indices list.
+            '''
+            
             real_batch_size = encoded_input.shape[0]
             # Encode real data in the Transformer
             model_outputs = transformer(
@@ -340,12 +384,9 @@ def train_gan(
             )
             hidden_states = model_outputs[-1]
 
-            # Define noise_size as the same size as the encoded_input
+            # Define noise_size 
             noise_size = 100
-
-            noise = torch.zeros((real_batch_size, noise_size), device=device).uniform_(
-                0, 1
-            )
+            noise = torch.zeros((real_batch_size, noise_size), device=device).uniform_(0, 1)
 
             # -------------------------------
 
@@ -380,7 +421,7 @@ def train_gan(
             Discriminator_real_probability = probability_list[0]
             Discriminator_fake_probability = probability_list[1]
             # --------------------------------------------------------------------------
-
+            # Compute losses for Generator and Discriminator
             generator_loss = generator_loss_function_train(
                 fake_predictions,
                 Discriminator_real_features,
@@ -395,33 +436,41 @@ def train_gan(
                 Discriminator_real_probability,
                 Discriminator_fake_probability,
             )
-
+            
+            # Backward pass and optimization step for both Generator and Discriminator
+            
+            #calling zero_grad() before a new backward pass ensures that
+            # the gradients from the previous iteration are cleared.
             generator_optimizer.zero_grad()
             discriminator_optimizer.zero_grad()
-
+            
             generator_loss.backward(retain_graph=True)
             discriminator_loss.backward()
+            
+            #This method is responsible for updating the model parameters based on the computed gradients
             generator_optimizer.step()
             discriminator_optimizer.step()
 
+            # Update training losses
             train_loss_g += torch.tensor(generator_loss.item())
             train_loss_d += torch.tensor(discriminator_loss.item())
-
+            
+        # Calculate average training losses
         train_loss_g /= len(train_dataloader)
         train_loss_d /= len(train_dataloader)
 
         # Validation loop
-        # generator.eval()
+        # generator.eval() # Commented out as generator is not being used in the validation loop
         discriminator.eval()
         transformer.eval()
 
-        for batch in validation_dataloader:
+        for batch in validation_dataloader: # Loop over batches in the validation dataloader
             # Unpack this training batch from our dataloader.
             encoded_input_val = batch[0].to(device)
             encoded_attention_mask_val = batch[1].to(device)
             labels_val = batch[2].to(device)
 
-            with torch.no_grad():
+            with torch.no_grad(): # Disable gradient computation during validation
                 real_batch_size_val = encoded_input_val.shape[0]
 
                 # Encode real data in the Transformer
@@ -430,12 +479,14 @@ def train_gan(
                 )
                 hidden_states_val = model_outputs_val[-1]
 
+                # Pass the hidden states through the Discriminator
                 discriminator_input_val = hidden_states_val
                 features_val, logits_val, probabilities_val = discriminator(
                     discriminator_input_val
                 )
                 filtered_logits_val = logits_val[:, 0:-1]
-
+                
+                # Calculate predictions, accuracy, and one-hot encoded predictions
                 real_prediction_supervised_val = filtered_logits_val
                 _, predictions_val = real_prediction_supervised_val.max(1)
                 _, labels_max_val = labels_val.max(1)
@@ -447,11 +498,12 @@ def train_gan(
                     predictions_val, num_classes=6
                 ).float()
                 one_hot_labels_val = labels_val
-
+                # Calculate validation loss
                 loss_val = loss_function_validation(
                     filtered_logits_val, one_hot_labels_val
                 )
 
+                # Update metrics for validation
                 validation_loss += torch.tensor(loss_val.item())
                 validation_data_count += one_hot_labels_val.size(0)
                 validation_corrects += correct_predictions_d_val
@@ -461,8 +513,9 @@ def train_gan(
                 validation_true_labels_f1.extend(
                     one_hot_labels_val.detach().cpu().max(1)[1]
                 )
+                
 
-        # Calculate average loss and accuracy
+        # Calculate average validation loss, accuracy, and F1 score
         validation_loss /= len(validation_dataloader)
         validation_accuracy = validation_corrects / validation_data_count
         validation_true_labels_f1_np = np.array(validation_true_labels_f1)
@@ -471,7 +524,7 @@ def train_gan(
             validation_true_labels_f1_np, validation_predictions_f1_np, average="weighted"
         )
 
-        # Update best model
+        # Update best model if validation accuracy improves
         if validation_accuracy > best_accuracy:
             best_accuracy = validation_accuracy
             best_epoch = epoch
@@ -494,7 +547,7 @@ def train_gan(
         results.append(result)
         # ------------------------------------------------------------------------------------------
 
-        # Update learning rate scheduler
+        # Update learning rate scheduler for the generator and discriminator if applicable
         if generator_scheduler is not None:
             generator_scheduler.step()
         if discriminator_scheduler is not None:
