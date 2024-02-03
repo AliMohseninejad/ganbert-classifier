@@ -132,7 +132,7 @@ def train_vanilla_classier(
         train_accuracy = corrects / data_count
         true_labels_f1_np = np.array(true_labels_f1)
         predictions_f1_np = np.array(predictions_f1)
-        train_f1 = f1_score(true_labels_f1_np, predictions_f1_np, average="micro")
+        train_f1 = f1_score(true_labels_f1_np, predictions_f1_np, average="weighted")
 
         # Validation
         classifier.eval()
@@ -183,7 +183,7 @@ def train_vanilla_classier(
         validation_f1 = f1_score(
             validation_true_labels_f1_np,
             validation_predictions_f1_np,
-            average="micro",
+            average="weighted",
         )
 
         # Update best model
@@ -468,7 +468,7 @@ def train_gan(
         validation_true_labels_f1_np = np.array(validation_true_labels_f1)
         validation_predictions_f1_np = np.array(validation_predictions_f1)
         validation_f1 = f1_score(
-            validation_true_labels_f1_np, validation_predictions_f1_np, average="micro"
+            validation_true_labels_f1_np, validation_predictions_f1_np, average="weighted"
         )
 
         # Update best model
